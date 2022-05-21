@@ -8,11 +8,11 @@
 struct termios orig_termios;
 
 /**
- * safdoasdfosajdfndsafdapsüf
- * @param s
+ * A exit method for the program.
+ * @param
  */
 void die(const char *s) {
-    perror(s);
+    perror(s); //prints a descriptive error message
     exit(1);
 }
 
@@ -39,12 +39,12 @@ void activateRawMode() {
     atexit(deactivateRawMode);
 
     struct termios raw_input = orig_termios;
-    raw_input.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-    raw_input.c_oflag &= ~(OPOST);
+    raw_input.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON); //turning off more flags like underneath
+    raw_input.c_oflag &= ~(OPOST); //turns off all output processing features
     raw_input.c_cflag |= (CS8);
-    raw_input.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-    raw_input.c_cc[VMIN] = 0;
-    raw_input.c_cc[VTIME] = 1;
+    raw_input.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG); //disables Ctrl-(C,Z,S,Q,V)
+    raw_input.c_cc[VMIN] = 0; //read() returns as soon as there is any input to read
+    raw_input.c_cc[VTIME] = 1; //100 milliseconds wait before read() returns
 
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw_input) == -1) die("tcsetattr");
 
@@ -62,9 +62,9 @@ int main() {
     while (1) {
         char c = '\0';
         if (read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN) die("read");
-        if (iscntrl(c)) {
-            printf("%d\r\n", c);
-        } else {
+        if (iscntrl(c)) { //if the input is control character -> print ascii value
+            printf("%d\r\n", c); //
+        } else { //print the character and the value
             printf("%d ('%c')\r\n", c, c);
         }
         if (c == 'q') break;
