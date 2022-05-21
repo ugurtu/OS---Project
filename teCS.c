@@ -7,12 +7,19 @@
 
 struct termios orig_termios;
 
-
+/**
+ * safdoasdfosajdfndsafdapsüf
+ * @param s
+ */
 void die(const char *s) {
     perror(s);
     exit(1);
 }
 
+/**
+ * This method returns the terminal back to its normal state. That means restoring the terminals original
+ * attributes when we exit the program. We store the original terminal attributes in orig_termios.
+ */
 void deactivateRawMode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
     die("tcsetattr");
