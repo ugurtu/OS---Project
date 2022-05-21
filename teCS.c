@@ -1,12 +1,19 @@
 #include <unistd.h>
 #include <termios.h>
 
+/**
+ * This method activates the raw mode. That means that it turn's the ECHO feature off.
+ * Acts the same way as if you are typing a password in the terminal.
+ * Terminal attributes will be red into the struct by the tcgetaatr() method. After modifying them
+ * they will by applied to the terminal by the tcsetattr() method. The TCSAFLUSH argument waits for
+ * all pending output to be written to the terminal, and also discards any input that hasn’t been read.
+ */
 void rawMode() {
 
     struct termios raw_input;
-    tcgetattr(STDIN_FILENO, &raw_input);
-    raw_input.c_lflag &= ~(ECHO);
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw_input);
+    tcgetattr(STDIN_FILENO, &raw_input); //Get the attributes for a terminal
+    raw_input.c_lflag &= ~(ECHO); //local flags. dumping ground for other state
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw_input); //Set the attributes for a terminal
 
 }
 /**
