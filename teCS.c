@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <termios.h>
+#include <stdlib.h>
 
 struct termios orig_termios;
 
