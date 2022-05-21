@@ -4,8 +4,12 @@
 
 struct termios orig_termios;
 
+/**
+ * This method returns the terminal back to its normal state. That means restoring the terminals original
+ * attributes when we exit the program. We store the original terminal attributes in orig_termios.
+ */
 void deactivateRawMode() {
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios); //leftover input is guaranteed to be not red by TCSAFLUSH.
 }
 
 /**
@@ -13,16 +17,16 @@ void deactivateRawMode() {
  * Acts the same way as if you are typing a password in the terminal.
  * Terminal attributes will be red into the struct by the tcgetaatr() method. After modifying them
  * they will by applied to the terminal by the tcsetattr() method. The TCSAFLUSH argument waits for
- * all pending output to be written to the terminal, and also discards any input that hasn’t been read.
+ * all pending output to be written to the terminal, and also discards any input that hasn't been read.
  */
 void activateRawMode() {
 
-    tcgetattr(STDIN_FILENO, &orig_termios);
-    atexit(deactivateRawMode);
+    tcgetattr(STDIN_FILENO, &orig_termios);  //Get the attributes for a terminal
+    atexit(deactivateRawMode); //calls the deactivateRawMode function automatically when the program exits.
 
     struct termios raw_input = orig_termios;
-    raw_input.c_lflag &= ~(ECHO);
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw_input);
+    raw_input.c_lflag &= ~(ECHO); //local flags. Echo is a bitflag
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw_input); //Set the attributes for a terminal
 
 }
 
