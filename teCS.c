@@ -86,32 +86,39 @@ char readKey() {
     return c;
 }
 
+/**
+ *  This function gets the cursor position. It's essentially a fallback function in case
+ *  ioctl() doesnt work.
+ * @param rows
+ * @param cols
+ * @return 0 if error
+ */
 int getCursorPosition(int *rows, int *cols) {
     char buf[32];
     unsigned int i = 0;
-    if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1;
+    if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1; //ask for the cursor position
     while (i < sizeof(buf) - 1) {
         if (read(STDIN_FILENO, &buf[i], 1) != 1) break;
-        if (buf[i] == 'R') break;
+        if (buf[i] == 'R') break; //we read the response into a buffer
         i++;
     }
     buf[i] = '\0';
-    if (buf[0] != '\x1b' || buf[1] != '[') return -1;
-    if (sscanf(&buf[2], "%d;%d", rows, cols) != 2) return -1;
+    if (buf[0] != '\x1b' || buf[1] != '[') return -1; //This ensures that we dont print the escape character
+    if (sscanf(&buf[2], "%d;%d", rows, cols) != 2) return -1; // 3rd char, two int's will be parsed to get rows and columns
 
     return 0;
 }
 
 /**
- * This function
- * @param rows
- * @param cols
- * @return
+ * This function returns the size of the window(terminal).
+ * @param rows value of number rows
+ * @param cols value of number columns
+ * @return Position of cursor
  */
 int getWindowSize(int *rows, int *cols) {
     struct winsize ws;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
-        if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1;
+        if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1; //moves the cursor to the right bottom
         return getCursorPosition(rows, cols);
     } else {
         *cols = ws.ws_col;
@@ -199,7 +206,9 @@ void processKeyPress() {
 }
 
 /*** init ***/
-
+/**
+ * Initializes all the fields in the E struct
+ */
 void initEditor() {
     if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize");
 }
