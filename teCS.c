@@ -1,13 +1,32 @@
 /*** includes ***/
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
+/*** defines ***/
+
+#define KILO_VERSION "0.0.1"
+
+#define CTRL_KEY(k) ((k) & 0x1f) //allows to quit the program with a ctrl-keymakro
+
 /*** data ***/
-struct termios orig_termios; //stores the terminal attributes
+/**
+ *
+ */
+struct editorConfig {
+    int screenrows;
+    int screencols;
+    struct termios orig_termios;
+};
+struct editorConfig E;//stores the terminal attributes
+
+
 
 /*** terminal ***/
 /**
@@ -15,6 +34,9 @@ struct termios orig_termios; //stores the terminal attributes
  * @param
  */
 void die(const char *s) {
+    write(STDOUT_FILENO, "\x1b[2J", 4); //the following two escape sequences clear the screen when we exit the program
+    write(STDOUT_FILENO, "\x1b[H", 3);
+
     perror(s); //prints a descriptive error message
     exit(1); // 1 because this indicates failure
 }
@@ -24,7 +46,7 @@ void die(const char *s) {
  * attributes when we exit the program. We store the original terminal attributes in orig_termios.
  */
 void deactivateRawMode() {
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1)
     die("tcsetattr");
 }
 
@@ -36,12 +58,11 @@ void deactivateRawMode() {
  * all pending output to be written to the terminal, and also discards any input that hasn't been red.
  */
 void activateRawMode() {
-    if (tcgetattr(STDIN_FILENO, &orig_termios) == -1) die("tcgetattr");
+    if (tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) die("tcgetattr");
 
-    tcgetattr(STDIN_FILENO, &orig_termios);
     atexit(deactivateRawMode);
 
-    struct termios raw_input = orig_termios;
+    struct termios raw_input = E.orig_termios;
     raw_input.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON); //turning off more flags like underneath
     raw_input.c_oflag &= ~(OPOST); //turns off all output processing features
     raw_input.c_cflag |= (CS8);
@@ -52,8 +73,137 @@ void activateRawMode() {
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw_input) == -1) die("tcsetattr");
 
 }
+/**
+ * This function waits for one keypress and returns it.
+ * @return the keypress
+ */
+char readKey() {
+    int n_read;
+    char c;
+    while ((n_read = read(STDIN_FILENO, &c, 1)) != 1) {
+        if (n_read == -1 && errno != EAGAIN) die("read");
+    }
+    return c;
+}
+
+int getCursorPosition(int *rows, int *cols) {
+    char buf[32];
+    unsigned int i = 0;
+    if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1;
+    while (i < sizeof(buf) - 1) {
+        if (read(STDIN_FILENO, &buf[i], 1) != 1) break;
+        if (buf[i] == 'R') break;
+        i++;
+    }
+    buf[i] = '\0';
+    if (buf[0] != '\x1b' || buf[1] != '[') return -1;
+    if (sscanf(&buf[2], "%d;%d", rows, cols) != 2) return -1;
+
+    return 0;
+}
+
+/**
+ * This function
+ * @param rows
+ * @param cols
+ * @return
+ */
+int getWindowSize(int *rows, int *cols) {
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
+        if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1;
+        return getCursorPosition(rows, cols);
+    } else {
+        *cols = ws.ws_col;
+        *rows = ws.ws_row;
+        return 0;
+    }
+}
+
+/*** append buffer ***/
+struct abuf {
+    char *b;
+    int len;
+};
+
+#define ABUF_INIT {NULL, 0}
+
+void abAppend(struct abuf *ab, const char *s, int len) {
+    char *new = realloc(ab->b, ab->len + len);
+    if (new == NULL) return;
+    memcpy(&new[ab->len], s, len);
+    ab->b = new;
+    ab->len += len;
+}
+void abFree(struct abuf *ab) {
+    free(ab->b);
+}
+/*** output ***/
+void refreshScreen() {
+    write(STDOUT_FILENO, "\x1b[2J", 4);
+    write(STDOUT_FILENO, "\x1b[H", 3);
+}
+
+/**
+ * This functions draws a tilde at every row like vim.
+ */
+void editorDrawRows(struct abuf *ab) {
+    int y;
+    for (y = 0; y < E.screenrows; y++) {
+        if (y == E.screenrows / 3) {
+            char welcome[80];
+            int welcomelen = snprintf(welcome, sizeof(welcome),
+                                      "Kilo editor -- version %s", KILO_VERSION);
+            if (welcomelen > E.screencols) welcomelen = E.screencols;
+            abAppend(ab, welcome, welcomelen);
+        } else {
+            abAppend(ab, "~", 1);
+        }
+        abAppend(ab, "\x1b[K", 3);
+        if (y < E.screenrows - 1) {
+            abAppend(ab, "\r\n", 2);
+        }
+    }
+}
+/**
+ * This function renders the interface.
+ */
+void editorRefreshScreen() {
+    struct abuf ab = ABUF_INIT;
+
+    abAppend(&ab, "\x1b[?25l", 6);
+    abAppend(&ab, "\x1b[H", 3);
+
+    editorDrawRows(&ab);
+
+    abAppend(&ab, "\x1b[H", 3);
+    abAppend(&ab, "\x1b[?25h", 6);
+
+    write(STDOUT_FILENO, ab.b, ab.len);
+    abFree(&ab);
+}
+
+/*** input ***/
+/**
+ * This function waits for a keypress, and then handles it.
+ */
+void processKeyPress() {
+    char c = readKey();
+    switch (c) {
+        case CTRL_KEY('q'):
+            write(STDOUT_FILENO, "\x1b[2J", 4); //escape sequence
+            write(STDOUT_FILENO, "\x1b[H", 3); //escape sequence
+            exit(0);
+            break;
+    }
+}
 
 /*** init ***/
+
+void initEditor() {
+    if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize");
+}
+
 /**
  * The keyboard input gets red into the variable c.
  * The while loop reads 1 byte from the standard input into c. It keeps doing it
@@ -62,16 +212,10 @@ void activateRawMode() {
  */
 int main() {
     activateRawMode();
-
+    initEditor();
     while (1) {
-        char c = '\0';
-        if (read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN) die("read");
-        if (iscntrl(c)) { //if the input is control character -> print ascii value
-            printf("%d\r\n", c); //
-        } else { //print the character and the value
-            printf("%d ('%c')\r\n", c, c);
-        }
-        if (c == 'q') break;
+        refreshScreen();
+        processKeyPress();
     }
 }
 
