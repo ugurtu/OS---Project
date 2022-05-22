@@ -32,7 +32,7 @@ enum editorKey {
  *
  */
 struct editorConfig {
-    int cx, cy;
+    int cx, cy; //The cursors x and y position
     int screenrows;
     int screencols;
     struct termios orig_termios;
@@ -177,20 +177,32 @@ int getWindowSize(int *rows, int *cols) {
 }
 
 /*** append buffer ***/
+
 struct abuf {
-    char *b;
+    char *b; //pointer to our buffer in memory
     int len;
 };
 
-#define ABUF_INIT {NULL, 0}
+#define ABUF_INIT {NULL, 0} //acts as a constructor
 
+/**
+ * This function appends the string to an abuf buffer
+ * @param ab append buffer
+ * @param s string
+ * @param len of string
+ */
 void abAppend(struct abuf *ab, const char *s, int len) {
-    char *new = realloc(ab->b, ab->len + len);
+    char *new = realloc(ab->b, ab->len + len); //alloc enough memory for the string. Current size of string + size of appending string
     if (new == NULL) return;
-    memcpy(&new[ab->len], s, len);
+    memcpy(&new[ab->len], s, len); //copies the string after the end of current data in buffer
     ab->b = new;
     ab->len += len;
 }
+
+/**
+ * This function deallocates the dynamic memory.
+ * @param ab append buffer
+ */
 void abFree(struct abuf *ab) {
     free(ab->b);
 }
@@ -204,9 +216,9 @@ void editorDrawRows(struct abuf *ab) {
             if (y == E.screenrows / 3) {
                 char welcome[80];
                 int welcomelen = snprintf(welcome, sizeof(welcome),
-                                          "Kilo editor -- version %s", KILO_VERSION);
+                                          "teCS editor -- version %s", KILO_VERSION); //displays the welcome message for our program
                 if (welcomelen > E.screencols) welcomelen = E.screencols;
-                int padding = (E.screencols - welcomelen) / 2;
+                int padding = (E.screencols - welcomelen) / 2; //This centers the welcome message in the terminal
                 if (padding) {
                     abAppend(ab, "~", 1);
                     padding--;
@@ -216,7 +228,7 @@ void editorDrawRows(struct abuf *ab) {
             } else {
                 abAppend(ab, "~", 1);
             }
-            abAppend(ab, "\x1b[K", 3);
+            abAppend(ab, "\x1b[K", 3); //clear line
             if (y < E.screenrows - 1) { //prints a tilde in the last line
                 abAppend(ab, "\r\n", 2);
             }
@@ -227,20 +239,20 @@ void editorDrawRows(struct abuf *ab) {
  * This function renders the interface.
  */
 void editorRefreshScreen() {
-    struct abuf ab = ABUF_INIT;
-    abAppend(&ab, "\x1b[?25l", 6);
+    struct abuf ab = ABUF_INIT; //init buffer
+    abAppend(&ab, "\x1b[?25l", 6); //hide cursor
     abAppend(&ab, "\x1b[H", 3);
 
     editorDrawRows(&ab);
 
     char buf[32];
-    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1);
+    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1); //moves the cursor to the position stored in E.cy & E.cx. Adding 1 because terminal uses 1-index
     abAppend(&ab, buf, strlen(buf));
 
     abAppend(&ab, "\x1b[H", 3);
-    abAppend(&ab, "\x1b[?25h", 6);
+    abAppend(&ab, "\x1b[?25h", 6); //show cursor
 
-    write(STDOUT_FILENO, ab.b, ab.len);
+    write(STDOUT_FILENO, ab.b, ab.len); //whole screen updates at once
     abFree(&ab);
 }
 
@@ -254,7 +266,7 @@ void editorMoveCursor(int key) {
             }
             break;
         case ARROW_RIGHT:
-            if (E.cx != E.screencols - 1) {
+            if (E.cx != E.screencols - 1) { //prevents the cursor to go past the right edges
                 E.cx++;
             }
             break;
@@ -264,7 +276,7 @@ void editorMoveCursor(int key) {
             }
             break;
         case ARROW_DOWN:
-            if (E.cy != E.screenrows - 1) {
+            if (E.cy != E.screenrows - 1) { //prevents the cursor to go past the left edges
                 E.cy++;
             }
             break;
@@ -285,10 +297,10 @@ void processKeyPress() {
             exit(0);
             break;
         case HOME_KEY:
-            E.cx = 0;
+            E.cx = 0; //moves the cursor to the left side of the screen
             break;
         case END_KEY:
-            E.cx = E.screencols - 1;
+            E.cx = E.screencols - 1; //moves the cursor to the right side of the screen
             break;
 
         case PAGE_UP:
@@ -313,8 +325,8 @@ void processKeyPress() {
  * Initializes all the fields in the E struct
  */
 void initEditor() {
-    E.cx = 0;
-    E.cy = 0;
+    E.cx = 0; //horizontal coordinate of cursor (column)
+    E.cy = 0; //vertical coordinate of cursor (row)
     if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize");
 }
 
