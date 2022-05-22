@@ -1,3 +1,4 @@
+/*** includes ***/
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
@@ -5,15 +6,17 @@
 #include <termios.h>
 #include <unistd.h>
 
-struct termios orig_termios;
+/*** data ***/
+struct termios orig_termios; //stores the terminal attributes
 
+/*** terminal ***/
 /**
  * A exit method for the program.
  * @param
  */
 void die(const char *s) {
     perror(s); //prints a descriptive error message
-    exit(1);
+    exit(1); // 1 because this indicates failure
 }
 
 /**
@@ -30,7 +33,7 @@ void deactivateRawMode() {
  * Acts the same way as if you are typing a password in the terminal.
  * Terminal attributes will be red into the struct by the tcgetaatr() method. After modifying them
  * they will by applied to the terminal by the tcsetattr() method. The TCSAFLUSH argument waits for
- * all pending output to be written to the terminal, and also discards any input that hasn’t been read.
+ * all pending output to be written to the terminal, and also discards any input that hasn't been red.
  */
 void activateRawMode() {
     if (tcgetattr(STDIN_FILENO, &orig_termios) == -1) die("tcgetattr");
@@ -50,6 +53,7 @@ void activateRawMode() {
 
 }
 
+/*** init ***/
 /**
  * The keyboard input gets red into the variable c.
  * The while loop reads 1 byte from the standard input into c. It keeps doing it
