@@ -377,7 +377,7 @@ int main() {
     activateRawMode();
     initEditor();
     if (argc >= 2) {
-    editorOpen(argv[1]);
+    editorOpen(argv[2]); //sali
     }
     while (1) {
         editorRefreshScreen();
