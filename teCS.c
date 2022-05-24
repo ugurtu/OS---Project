@@ -34,12 +34,14 @@ enum editorKey {
 };
 
 /*** data ***/
-
+/**
+ * erow stores line of text as a pointer to the dynamicallyallocated char data and a lenght.
+ */
 typedef struct erow {
     int size;
-    int rsize;
+    int rsize; //size of the contents of render
     char *chars;
-    char *render;
+    char *render; //contains the characters to draw on the screen for that row of text
 } erow;
 
 /**
@@ -187,9 +189,9 @@ int getCursorPosition(int *rows, int *cols) {
         i++;
     }
     buf[i] = '\0';
-    if (buf[0] != '\x1b' || buf[1] != '[') return -1; //This ensures that we dont print the escape character
+    if (buf[0] != '\x1b' || buf[1] != '[') return -1; //This ensures that we don't print the escape character
     if (sscanf(&buf[2], "%d;%d", rows, cols) != 2)
-        return -1; // 3rd char, two int's will be parsed to get rows and columns
+        return -1; // 3rd char, two int will be parsed to get rows and columns
 
     return 0;
 }
@@ -214,9 +216,9 @@ int getWindowSize(int *rows, int *cols) {
 
 /*** row operations ***/
 void editorAppendRow(char *s, size_t len) {
-    E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1));
+    E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1)); //multiply the number of bytes of each erow by the number of rows.
 
-    int at = E.numrows;
+    int at = E.numrows; // setting at to the index of the new row we initialize
     E.row[at].size = len;
     E.row[at].chars = malloc(len + 1);
     memcpy(E.row[at].chars, s, len);
@@ -262,12 +264,15 @@ void abFree(struct abuf *ab) {
 }
 
 /*** output ***/
-
+/**
+ * This function checks if the users cursor has moved outside of the visible window
+ * and adjusts E.rowoff so that the cursor is just inside the visible window.
+ */
 void editorScroll() {
     if (E.cy < E.rowoff) {
         E.rowoff = E.cy;
     }
-    if (E.cy >= E.rowoff + E.screenrows) {
+    if (E.cy >= E.rowoff + E.screenrows) { //checks if the cursor is past the bottom of the visible window.
         E.rowoff = E.cy - E.screenrows + 1;
     }
     if (E.cx < E.coloff) {
@@ -285,12 +290,12 @@ void editorScroll() {
 void editorDrawRows(struct abuf *ab) {
     int y;
     for (y = 0; y < E.screenrows; y++) {
-        int filerow = y + E.rowoff;
+        int filerow = y + E.rowoff; //at each y position we add E.rowoff to the y position
         if (filerow >= E.numrows) {
-            if (E.numrows == 0 && y == E.screenrows / 3) {
+            if (E.numrows == 0 && y == E.screenrows / 3) { //shows the welcome message only when the editor opens without selecting a file
                 char welcome[80];
                 int welcomelen = snprintf(welcome, sizeof(welcome),
-                                          "Kilo editor -- version %s", KILO_VERSION);
+                                          "teCS -- version %s", KILO_VERSION);
                 if (welcomelen > E.screencols) welcomelen = E.screencols;
                 int padding = (E.screencols - welcomelen) / 2;
                 if (padding) {
@@ -303,10 +308,10 @@ void editorDrawRows(struct abuf *ab) {
                 abAppend(ab, "~", 1);
             }
         } else {
-            int len = E.row[filerow].size - E.coloff;
-            if (len < 0) len = 0;
+            int len = E.row[filerow].rsize - E.coloff; //subtract the number of characters that are to the left of the offset from the length of the row.
+            if (len < 0) len = 0; //setting len = 0 so that nothing is displayed on that line
             if (len > E.screencols) len = E.screencols;
-            abAppend(ab, &E.row[filerow].chars[E.coloff], len);
+            abAppend(ab, &E.row[filerow].render[E.coloff], len); //displays each row at the column offset
         }
         abAppend(ab, "\x1b[K", 3);
         if (y < E.screenrows - 1) {
@@ -340,15 +345,18 @@ void editorRefreshScreen() {
 }
 
 /*** input ***/
-
+/**
+ * Handles the the cursor position
+ * @param key pressed
+ */
 void editorMoveCursor(int key) {
-    erow *row = (E.cy >= E.numrows) ? NULL : &E.row[E.cy];
+    erow *row = (E.cy >= E.numrows) ? NULL : &E.row[E.cy]; //checks if the cursor is on actual line
 
     switch (key) {
         case ARROW_LEFT:
             if (E.cx != 0) {
                 E.cx--;
-            } else if (E.cy > 0) {
+            } else if (E.cy > 0) { // allows to press <- at beginning of new line to come to previous line's end.
                 E.cy--;
                 E.cx = E.row[E.cy].size;
             }
@@ -356,7 +364,7 @@ void editorMoveCursor(int key) {
         case ARROW_RIGHT:
             if (row && E.cx < row->size) {
                 E.cx++;
-            } else if (row && E.cx == row->size) {
+            } else if (row && E.cx == row->size) { //opposite of <-. This allows user to press -> at the end of a line and appear then at the beginning of next line
                 E.cy++;
                 E.cx = 0;
             }
@@ -375,8 +383,8 @@ void editorMoveCursor(int key) {
 
     row = (E.cy >= E.numrows) ? NULL : &E.row[E.cy];
     int rowlen = row ? row->size : 0;
-    if (E.cx > rowlen) {
-        E.cx = rowlen;
+    if (E.cx > rowlen) { //if cx is to the right of the end of that line
+        E.cx = rowlen; //set cx as end of that line
     }
 }
 
@@ -415,19 +423,26 @@ void processKeyPress() {
     }
 }
 
+/**
+ * This method opens and reads a file from the disk. It takes the filename and opens the file.
+ * @param filename file which will be opened and red.
+ */
 void editorOpen(char *filename) {
-    FILE *fp = fopen(filename, "r");
+    free(E.filename);
+    E.filename = strdup(filename);
+
+    FILE *fp = fopen(filename, "r"); //opens the file
     if (!fp) die("fopen");
     char *line = NULL;
     size_t linecap = 0;
     ssize_t linelen;
-    while ((linelen = getline(&line, &linecap, fp)) != -1) {
+    while ((linelen = getline(&line, &linecap, fp)) != -1) { //allows to read an entire file into E.row
         while (linelen > 0 && (line[linelen - 1] == '\n' ||
                                line[linelen - 1] == '\r'))
             linelen--;
         editorAppendRow(line, linelen);
     }
-    free(line);
+    free(line); //freeing from allocation
     fclose(fp);
 }
 
