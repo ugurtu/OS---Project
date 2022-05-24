@@ -232,11 +232,13 @@ int editorRowCxToRx(erow *row, int cx) {
     int j;
     for (j = 0; j < cx; j++) { //loop through all the characters left of cx
         if (row->chars[j] == '\t')
-            rx += (KILO_TAB_STOP - 1) - (rx % KILO_TAB_STOP); //substract the amount of columns we are right of last tab stop from amount of columns to the left of next tab stop.
+            rx += (KILO_TAB_STOP - 1) - (rx %
+                                         KILO_TAB_STOP); //substract the amount of columns we are right of last tab stop from amount of columns to the left of next tab stop.
         rx++; // this gets us to the next tab stop
     }
     return rx;
 }
+
 /**
  * This function uses the chars string of an erow to fill the contents of the rendered string.
  * @param row
@@ -247,12 +249,13 @@ void editorUpdateRow(erow *row) {
     for (j = 0; j < row->size; j++)
         if (row->chars[j] == '\t') tabs++; //we loop through the chars of the row
     free(row->render);
-    row->render = malloc(row->size + tabs*(KILO_TAB_STOP - 1) + 1); //allocate memory for render(count of tabs)
+    row->render = malloc(row->size + tabs * (KILO_TAB_STOP - 1) + 1); //allocate memory for render(count of tabs)
     int idx = 0;
     for (j = 0; j < row->size; j++) {
         if (row->chars[j] == '\t') { //checks whether the current character is a tab
             row->render[idx++] = ' '; // if it is, we append one space
-            while (idx % KILO_TAB_STOP != 0) row->render[idx++] = ' '; //append spaces until we get a tab stop, which is a column divisible by 8
+            while (idx % KILO_TAB_STOP != 0)
+                row->render[idx++] = ' '; //append spaces until we get a tab stop, which is a column divisible by 8
         } else {
             row->render[idx++] = row->chars[j];
         }
@@ -260,6 +263,7 @@ void editorUpdateRow(erow *row) {
     row->render[idx] = '\0';
     row->rsize = idx; //contains the number of characters of row -> render
 }
+
 /**
  * This function allocates space for a new erow, and then copies the given string
  * to a new erow at the end of the E.row array.
@@ -267,7 +271,8 @@ void editorUpdateRow(erow *row) {
  * @param len of line
  */
 void editorAppendRow(char *s, size_t len) {
-    E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1)); //multiply the number of bytes of each erow by the number of rows.
+    E.row = realloc(E.row,
+                    sizeof(erow) * (E.numrows + 1)); //multiply the number of bytes of each erow by the number of rows.
 
     int at = E.numrows; // setting at to the index of the new row we initialize
     E.row[at].size = len;
@@ -338,6 +343,7 @@ void editorScroll() {
         E.coloff = E.rx - E.screencols + 1;
     }
 }
+
 /**
  * This function gives us useful information about the file
  * @param ab
@@ -345,24 +351,29 @@ void editorScroll() {
 void editorDrawStatusBar(struct abuf *ab) {
     abAppend(ab, "\x1b[7m", 4);
     char status[80], rstatus[80];
-    int len = snprintf(status, sizeof(status), "%.20s - %d lines", //Up to 20 characters of the file name is displayed & number of lines
-                       E.filename ? E.filename : "[No Name]", E.numrows); //If the file has no name, then we just display "No Name"
-    int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d", //shows the current line number on the right edge of the window
+    int len = snprintf(status, sizeof(status),
+                       "%.20s - %d lines", //Up to 20 characters of the file name is displayed & number of lines
+                       E.filename ? E.filename : "[No Name]",
+                       E.numrows); //If the file has no name, then we just display "No Name"
+    int rlen = snprintf(rstatus, sizeof(rstatus),
+                        "%d/%d", //shows the current line number on the right edge of the window
                         E.cy + 1, E.numrows); //have to add +1 because e.cy is indexed with 0
-    if (len > E.screencols) len = E.screencols; //cuts the status string short if it doesnt fit in the window
+    if (len > E.screencols) len = E.screencols; //cuts the status string short if it doesn't fit in the window
     abAppend(ab, status, len);
     while (len < E.screencols) {
-        if (E.screencols - len == rlen) { //if lenght are equal to status string
+        if (E.screencols - len == rlen) { //if length are equal to status string
             abAppend(ab, rstatus, rlen); //print the status and break
             break;
         } else {
-            abAppend(ab, " ", 1); //else print spaces as long as we get to the point where status is againts edge of screen.
+            abAppend(ab, " ",
+                     1); //else print spaces as long as we get to the point where status is against edge of screen.
             len++;
         }
     }
-    abAppend(ab, "\x1b[m", 3);
+    abAppend(ab, "\x1b[m", 3);//Bold
     abAppend(ab, "\r\n", 2);
 }
+
 /**
  * This function draws a message bar and then displays that in that bar
  * @param ab
@@ -383,7 +394,8 @@ void editorDrawRows(struct abuf *ab) {
     for (y = 0; y < E.screenrows; y++) {
         int filerow = y + E.rowoff; //at each y position we add E.rowoff to the y position
         if (filerow >= E.numrows) {
-            if (E.numrows == 0 && y == E.screenrows / 3) { //shows the welcome message only when the editor opens without selecting a file
+            if (E.numrows == 0 &&
+                y == E.screenrows / 3) { //shows the welcome message only when the editor opens without selecting a file
                 char welcome[80];
                 int welcomelen = snprintf(welcome, sizeof(welcome),
                                           "teCS -- version %s", KILO_VERSION);
@@ -399,7 +411,8 @@ void editorDrawRows(struct abuf *ab) {
                 abAppend(ab, "~", 1);
             }
         } else {
-            int len = E.row[filerow].rsize - E.coloff; //subtract the number of characters that are to the left of the offset from the length of the row.
+            int len = E.row[filerow].rsize -
+                      E.coloff; //subtract the number of characters that are to the left of the offset from the length of the row.
             if (len < 0) len = 0; //setting len = 0 so that nothing is displayed on that line
             if (len > E.screencols) len = E.screencols;
             abAppend(ab, &E.row[filerow].render[E.coloff], len); //displays each row at the column offset
@@ -427,7 +440,8 @@ void editorRefreshScreen() {
 
     char buf[32];
     snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1,
-             (E.rx - E.coloff) + 1); //To position the cursor on the screen, we have to subtract E.rowoff from E.cy. Same with E.rx. vor horizontal scrolling.
+             (E.rx - E.coloff) +
+             1); //To position the cursor on the screen, we have to subtract E.rowoff from E.cy. Same with E.rx. vor horizontal scrolling.
 
     abAppend(&ab, buf, strlen(buf));
 
@@ -436,6 +450,7 @@ void editorRefreshScreen() {
     write(STDOUT_FILENO, ab.b, ab.len); //whole screen updates at once
     abFree(&ab);
 }
+
 /**
  * This function takes a format string and number of arguments
  * @param fmt
@@ -469,7 +484,8 @@ void editorMoveCursor(int key) {
         case ARROW_RIGHT:
             if (row && E.cx < row->size) {
                 E.cx++;
-            } else if (row && E.cx == row->size) { //opposite of <-. This allows user to press -> at the end of a line and appear then at the beginning of next line
+            } else if (row && E.cx ==
+                              row->size) { //opposite of <-. This allows user to press -> at the end of a line and appear then at the beginning of next line
                 E.cy++;
                 E.cx = 0;
             }
@@ -514,8 +530,7 @@ void processKeyPress() {
             break;
 
         case PAGE_UP:
-        case PAGE_DOWN:
-        {
+        case PAGE_DOWN: {
             if (c == PAGE_UP) { //alows to scroll up
                 E.cy = E.rowoff;
             } else if (c == PAGE_DOWN) { //allows to scroll down
