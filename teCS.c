@@ -28,6 +28,12 @@ enum editorKey {
 };
 
 /*** data ***/
+
+typedef struct erow {
+  int size;
+  char *chars;
+} erow;
+
 /**
  *
  */
@@ -35,6 +41,8 @@ struct editorConfig {
     int cx, cy; //The cursors x and y position
     int screenrows;
     int screencols;
+    int numrows;
+    erow row;
     struct termios orig_termios;
 };
 struct editorConfig E;//stores the terminal attributes
@@ -214,10 +222,11 @@ void abFree(struct abuf *ab) {
 void editorDrawRows(struct abuf *ab) {
     int y;
     for (y = 0; y < E.screenrows; y++) { //displays the proper number of the rows
+           if (y >= E.numrows) {
             if (y == E.screenrows / 3) {
                 char welcome[80];
                 int welcomelen = snprintf(welcome, sizeof(welcome),
-                                          "teCS editor -- version %s", KILO_VERSION); //displays the welcome message for our program
+                                          "teCS Editor -- version %s", KILO_VERSION); //displays the welcome message for our program
                 if (welcomelen > E.screencols) welcomelen = E.screencols;
                 int padding = (E.screencols - welcomelen) / 2; //This centers the welcome message in the terminal
                 if (padding) {
@@ -229,6 +238,11 @@ void editorDrawRows(struct abuf *ab) {
             } else {
                 abAppend(ab, "~", 1);
             }
+            else {
+      int len = E.row.size;
+      if (len > E.screencols) len = E.screencols;
+      abAppend(ab, E.row.chars, len);
+    }
             abAppend(ab, "\x1b[K", 3); //clear line
             if (y < E.screenrows - 1) { //prints a tilde in the last line
                 abAppend(ab, "\r\n", 2);
@@ -321,6 +335,27 @@ void processKeyPress() {
     }
 }
 
+void editorOpen(char *filename) {
+  FILE *fp = fopen(filename, "r");
+  if (!fp) die("fopen");
+  char *line = NULL;
+  size_t linecap = 0;
+  ssize_t linelen;
+  linelen = getline(&line, &linecap, fp);
+  if (linelen != -1) {
+    while (linelen > 0 && (line[linelen - 1] == '\n' ||
+                           line[linelen - 1] == '\r'))
+      linelen--;
+    E.row.size = linelen;
+    E.row.chars = malloc(linelen + 1);
+    memcpy(E.row.chars, line, linelen);
+    E.row.chars[linelen] = '\0';
+    E.numrows = 1;
+  }
+  free(line);
+  fclose(fp);
+}
+
 /*** init ***/
 /**
  * Initializes all the fields in the E struct
@@ -328,6 +363,7 @@ void processKeyPress() {
 void initEditor() {
     E.cx = 0; //horizontal coordinate of cursor (column)
     E.cy = 0; //vertical coordinate of cursor (row)
+     E.numrows = 0;
     if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize");
 }
 
@@ -340,6 +376,9 @@ void initEditor() {
 int main() {
     activateRawMode();
     initEditor();
+    if (argc >= 2) {
+    editorOpen(argv[1]);
+    }
     while (1) {
         editorRefreshScreen();
         processKeyPress();
