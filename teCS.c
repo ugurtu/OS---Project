@@ -264,9 +264,6 @@ int getWindowSize(int *rows, int *cols) {
 
 /*** syntax highlighting ***/
 
-int is_separator(int c) {
-    return isspace(c) || c == '\0' || strchr(",.()+-/*=~%<>[];", c) != NULL;
-}
 
 void editorUpdateSyntax(erow *row) {
     row->hl = realloc(row->hl, row->rsize);
@@ -416,8 +413,6 @@ void editorUpdateRow(erow *row) {
     }
     row->render[idx] = '\0';
     row->rsize = idx; //contains the number of characters of row -> render
-
-    editorUpdateSyntax(row);
 }
 
 /**
@@ -928,14 +923,6 @@ void editorFindCallback(char *query, int key) {
     static int last_match = -1; //last match of search
     static int direction = 1; // stores direction of search
 
-    static int saved_hl_line;
-    static char *saved_hl = NULL;
-    if (saved_hl) {
-        memcpy(E.row[saved_hl_line].hl, saved_hl, E.row[saved_hl_line].rsize);
-        free(saved_hl);
-        saved_hl = NULL;
-    }
-
     if (key == '\r' || key == '\x1b') { //checks wheter we pressed Enter or Escape
         last_match = -1;
         direction = 1;
@@ -973,7 +960,8 @@ void editorFindCallback(char *query, int key) {
 }
 
 /**
- * This function allows us to position the cursor back to its position before the search query if we cancel the search.
+ * This function allows us to position the cursor back
+ * to its position before the search query if we cancel the search.
  */
 void editorFind() {
     int saved_cx = E.cx;
