@@ -40,26 +40,6 @@ enum editorKey {
 
 /*** data ***/
 
-struct editorSyntax {
-    char *filetype;
-    char **filematch;
-    char *singleline_comment_start;
-    int flags;
-};
-
-enum editorHighlight {
-    HL_NORMAL = 0,
-    HL_COMMENT,
-    HL_KEYWORD1,
-    HL_KEYWORD2,
-    HL_STRING,
-    HL_NUMBER,
-    HL_MATCH
-};
-
-#define HL_HIGHLIGHT_NUMBERS (1<<0)
-#define HL_HIGHLIGHT_STRINGS (1<<1)
-
 /**
  * erow stores line of text as a pointer to the dynamically-allocated char data and a length.
  */
@@ -68,7 +48,6 @@ typedef struct erow {
     int rsize; //size of the contents of render
     char *chars;
     char *render; //contains the characters to draw on the screen for that row of text
-    unsigned char *hl;
 } erow;
 
 /**
@@ -87,25 +66,14 @@ struct editorConfig {
     char *filename;
     char statusmsg[80];
     time_t statusmsg_time;
-    struct editorSyntax *syntax;
     struct termios orig_termios;
 };
 struct editorConfig E;//stores the terminal attributes
 
-/*** filetypes ***/
-char *C_HL_extensions[] = { ".c", ".h", ".cpp", NULL };
-struct editorSyntax HLDB[] = {
-        {
-                "c",
-                C_HL_extensions,
-                "//",
-                HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STRINGS
-        },
-};
-#define HLDB_ENTRIES (sizeof(HLDB) / sizeof(HLDB[0]))
-
 void editorSetStatusMessage(const char *fmt, ...);
+
 void editorRefreshScreen();
+
 char *editorPrompt(char *prompt, void (*callback)(char *, int));
 
 
@@ -265,95 +233,6 @@ int getWindowSize(int *rows, int *cols) {
 /*** syntax highlighting ***/
 
 
-void editorUpdateSyntax(erow *row) {
-    row->hl = realloc(row->hl, row->rsize);
-    memset(row->hl, HL_NORMAL, row->rsize);
-    if (E.syntax == NULL) return;
-    char *scs = E.syntax->singleline_comment_start;
-    int scs_len = scs ? strlen(scs) : 0;
-    int prev_sep = 1;
-    int in_string = 0;
-    int i = 0;
-    while (i < row->rsize) {
-        char c = row->render[i];
-        unsigned char prev_hl = (i > 0) ? row->hl[i - 1] : HL_NORMAL;
-        if (scs_len && !in_string) {
-            if (!strncmp(&row->render[i], scs, scs_len)) {
-                memset(&row->hl[i], HL_COMMENT, row->rsize - i);
-                break;
-            }
-        }
-        if (E.syntax->flags & HL_HIGHLIGHT_STRINGS) {
-            if (in_string) {
-                row->hl[i] = HL_STRING;
-                if (c == '\\' && i + 1 < row->rsize) {
-                    row->hl[i + 1] = HL_STRING;
-                    i += 2;
-                    continue;
-                }
-                if (c == in_string) in_string = 0;
-                i++;
-                prev_sep = 1;
-                continue;
-            } else {
-                if (c == '"' || c == '\'') {
-                    in_string = c;
-                    row->hl[i] = HL_STRING;
-                    i++;
-                    continue;
-                }
-            }
-        }
-        if (E.syntax->flags & HL_HIGHLIGHT_NUMBERS) {
-            if ((isdigit(c) && (prev_sep || prev_hl == HL_NUMBER)) ||
-                (c == '.' && prev_hl == HL_NUMBER)) {
-                row->hl[i] = HL_NUMBER;
-                i++;
-                prev_sep = 0;
-                continue;
-            }
-        }
-        prev_sep = is_separator(c);
-        i++;
-    }
-}
-
-int editorSyntaxToColor(int hl) {
-    switch (hl) {
-        case HL_COMMENT: return 36;
-        case HL_KEYWORD1: return 33;
-        case HL_KEYWORD2: return 32;
-        case HL_STRING: return 35;
-        case HL_NUMBER: return 31;
-        case HL_MATCH: return 34;
-        default: return 37;
-    }
-}
-
-void editorSelectSyntaxHighlight() {
-    E.syntax = NULL;
-    if (E.filename == NULL) return;
-    char *ext = strrchr(E.filename, '.');
-    for (unsigned int j = 0; j < HLDB_ENTRIES; j++) {
-        struct editorSyntax *s = &HLDB[j];
-        unsigned int i = 0;
-        while (s->filematch[i]) {
-            int is_ext = (s->filematch[i][0] == '.');
-            if ((is_ext && ext && !strcmp(ext, s->filematch[i])) ||
-                (!is_ext && strstr(E.filename, s->filematch[i]))) {
-                E.syntax = s;
-
-                int filerow;
-                for (filerow = 0; filerow < E.numrows; filerow++) {
-                    editorUpdateSyntax(&E.row[filerow]);
-                }
-
-                return;
-            }
-            i++;
-        }
-    }
-}
 /*** row operations ***/
 /**
  * This function converts chars index into a render index
@@ -390,6 +269,7 @@ int editorRowRxToCx(erow *row, int rx) {
     }
     return cx; //if rx is out of range
 }
+
 /**
  * This function uses the chars string of an erow to fill the contents of the rendered string.
  * @param row
@@ -425,7 +305,8 @@ void editorUpdateRow(erow *row) {
 void editorInsertRow(int at, char *s, size_t len) {
     if (at < 0 || at > E.numrows) return; //validate at
     E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1)); //allocate memory for one more erow
-    memmove(&E.row[at + 1], &E.row[at], sizeof(erow) * (E.numrows - at)); //make room at the specified index for the new row
+    memmove(&E.row[at + 1], &E.row[at],
+            sizeof(erow) * (E.numrows - at)); //make room at the specified index for the new row
 
     E.row[at].size = len;
     E.row[at].chars = malloc(len + 1);
@@ -434,7 +315,6 @@ void editorInsertRow(int at, char *s, size_t len) {
 
     E.row[at].rsize = 0;
     E.row[at].render = NULL;
-    E.row[at].hl = NULL;
     editorUpdateRow(&E.row[at]);
 
     E.numrows++;
@@ -448,8 +328,8 @@ void editorInsertRow(int at, char *s, size_t len) {
 void editorFreeRow(erow *row) {
     free(row->render);
     free(row->chars);
-    free(row->hl);
 }
+
 /**
  * This function deletes the erow.
  * @param at
@@ -457,7 +337,8 @@ void editorFreeRow(erow *row) {
 void editorDelRow(int at) {
     if (at < 0 || at >= E.numrows) return; //validate the at index
     editorFreeRow(&E.row[at]); //free memory owned by the row
-    memmove(&E.row[at], &E.row[at + 1], sizeof(erow) * (E.numrows - at - 1)); //overwrite the deleted row struct with rest of rowes which come after
+    memmove(&E.row[at], &E.row[at + 1],
+            sizeof(erow) * (E.numrows - at - 1)); //overwrite the deleted row struct with rest of rowes which come after
     E.numrows--;
     E.dirty++;
 }
@@ -470,7 +351,8 @@ void editorDelRow(int at) {
  */
 void editorRowInsertChar(erow *row, int at, int c) {
     if (at < 0 || at > row->size) at = row->size;
-    row->chars = realloc(row->chars, row->size + 2); //allocate one more byte for the chars of erow. + 2 because making room for null byte.
+    row->chars = realloc(row->chars, row->size +
+                                     2); //allocate one more byte for the chars of erow. + 2 because making room for null byte.
     memmove(&row->chars[at + 1], &row->chars[at], row->size - at + 1); //memmove makes room for the new character
     row->size++;
     row->chars[at] = c; //assign the character to its position in the chars array
@@ -500,11 +382,13 @@ void editorRowAppendString(erow *row, char *s, size_t len) {
  */
 void editorRowDelChar(erow *row, int at) {
     if (at < 0 || at >= row->size) return;
-    memmove(&row->chars[at], &row->chars[at + 1], row->size - at); //overwrites the deleted character with the characters that come after it
+    memmove(&row->chars[at], &row->chars[at + 1],
+            row->size - at); //overwrites the deleted character with the characters that come after it
     row->size--; //decrement the row size
     editorUpdateRow(row); //updates the rows
     E.dirty++;
 }
+
 /**
  * This function deletes the character left to the cursor.
  */
@@ -531,7 +415,7 @@ void editorDelChar() {
  */
 void editorInsertChar(int c) {
     if (E.cy == E.numrows) { //if condition is true, then we append a new row to the file before inserting character
-        editorInsertRow(E.numrows,"", 0);
+        editorInsertRow(E.numrows, "", 0);
     }
     editorRowInsertChar(&E.row[E.cy], E.cx, c);
     E.cx++; //moving the cursor forward, so that the next character we insert comes after the just inserted character
@@ -545,7 +429,8 @@ void editorInsertNewline() {
         editorInsertRow(E.cy, "", 0); //insert a new blank row
     } else {
         erow *row = &E.row[E.cy];
-        editorInsertRow(E.cy + 1, &row->chars[E.cx], row->size - E.cx); //pass the characters on current row which are right of the cursor
+        editorInsertRow(E.cy + 1, &row->chars[E.cx],
+                        row->size - E.cx); //pass the characters on current row which are right of the cursor
         row = &E.row[E.cy]; //reassign the row pointer
         row->size = E.cx; //cut off current rows content by setting size to the position of the cursor
         row->chars[row->size] = '\0'; //signifies end of line
@@ -621,8 +506,8 @@ void editorDrawStatusBar(struct abuf *ab) {
     int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
                        E.filename ? E.filename : "[No Name]", E.numrows,
                        E.dirty ? "(modified)" : "");
-    int rlen = snprintf(rstatus, sizeof(rstatus), "%s | %d/%d",
-                        E.syntax ? E.syntax->filetype : "no ft", E.cy + 1, E.numrows);
+    int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d",
+                        E.cy + 1, E.numrows);
     if (len > E.screencols) len = E.screencols;
     abAppend(ab, status, len);
     while (len < E.screencols) {
@@ -637,6 +522,7 @@ void editorDrawStatusBar(struct abuf *ab) {
     abAppend(ab, "\x1b[m", 3);
     abAppend(ab, "\r\n", 2);
 }
+
 
 /**
  * This function draws a message bar and then displays that in that bar
@@ -656,13 +542,12 @@ void editorDrawMessageBar(struct abuf *ab) {
 void editorDrawRows(struct abuf *ab) {
     int y;
     for (y = 0; y < E.screenrows; y++) {
-        int filerow = y + E.rowoff; //at each y position we add E.rowoff to the y position
+        int filerow = y + E.rowoff;
         if (filerow >= E.numrows) {
-            if (E.numrows == 0 &&
-                y == E.screenrows / 3) { //shows the welcome message only when the editor opens without selecting a file
+            if (E.numrows == 0 && y == E.screenrows / 3) {
                 char welcome[80];
                 int welcomelen = snprintf(welcome, sizeof(welcome),
-                                          "teCS -- version %s", KILO_VERSION);
+                                          "Kilo editor -- version %s", KILO_VERSION);
                 if (welcomelen > E.screencols) welcomelen = E.screencols;
                 int padding = (E.screencols - welcomelen) / 2;
                 if (padding) {
@@ -675,36 +560,14 @@ void editorDrawRows(struct abuf *ab) {
                 abAppend(ab, "~", 1);
             }
         } else {
-            int len = E.row[filerow].rsize -
-                      E.coloff; //subtract the number of characters that are to the left of the offset from the length of the row.
-            if (len < 0) len = 0; //setting len = 0 so that nothing is displayed on that line
+            int len = E.row[filerow].rsize - E.coloff;
+            if (len < 0) len = 0;
             if (len > E.screencols) len = E.screencols;
-            char *c = &E.row[filerow].render[E.coloff];
-            unsigned char *hl = &E.row[filerow].hl[E.coloff];
-            int current_color = -1;
-            int j;
-            for (j = 0; j < len; j++) {
-                if (hl[j] == HL_NORMAL) {
-                    if (current_color != -1) {
-                        abAppend(ab, "\x1b[39m", 5);
-                        current_color = -1;
-                    }
-                    abAppend(ab, &c[j], 1);
-                } else {
-                    int color = editorSyntaxToColor(hl[j]);
-                    if (color != current_color) {
-                        current_color = color;
-                        char buf[16];
-                        int clen = snprintf(buf, sizeof(buf), "\x1b[%dm", color);
-                        abAppend(ab, buf, clen);
-                    }
-                    abAppend(ab, &c[j], 1);
-                }
-            }
-            abAppend(ab, "\x1b[39m", 5);
+            abAppend(ab, &E.row[filerow].render[E.coloff], len);
         }
         abAppend(ab, "\x1b[K", 3);
         abAppend(ab, "\r\n", 2);
+
     }
 }
 
@@ -756,7 +619,7 @@ void editorSetStatusMessage(const char *fmt, ...) {
  * @param prompt
  * @return
  */
-char *editorPrompt(char *prompt,void (*callback)(char *, int)) {
+char *editorPrompt(char *prompt, void (*callback)(char *, int)) {
     size_t bufsize = 128;
     char *buf = malloc(bufsize); //input is stored in buf which is dynamically allocated
     size_t buflen = 0;
@@ -767,8 +630,7 @@ char *editorPrompt(char *prompt,void (*callback)(char *, int)) {
         int c = readKey(); //waits for keypress
         if (c == DEL_KEY || c == CTRL_KEY('h') || c == BACKSPACE) {
             if (buflen != 0) buf[--buflen] = '\0';
-        }
-        else if (c == '\x1b') { //if escape is pressed
+        } else if (c == '\x1b') { //if escape is pressed
             editorSetStatusMessage("");
             if (callback) callback(buf, c);
             free(buf); //free the buf
@@ -779,7 +641,8 @@ char *editorPrompt(char *prompt,void (*callback)(char *, int)) {
                 if (callback) callback(buf, c); //if we dont want to use callpack we can just pass null
                 return buf; //input returned
             }
-        } else if (!iscntrl(c) && c < 128) { //if printable char is entered and also test if char has value less than 128 to check if special char
+        } else if (!iscntrl(c) && c <
+                                  128) { //if printable char is entered and also test if char has value less than 128 to check if special char
             if (buflen == bufsize - 1) { //if buflen reached maximum capacity
                 buf = realloc(buf, bufsize); //allocate the amount of memory before appending to buf
             }
@@ -844,7 +707,8 @@ char *editorRowsToString(int *buflen) {
     int totlen = 0;
     int j;
     for (j = 0; j < E.numrows; j++)
-        totlen += E.row[j].size + 1; //adds up the lengths of each row of text and adding 1 to each one for the newline character we’ll add to the end of each line
+        totlen += E.row[j].size +
+                  1; //adds up the lengths of each row of text and adding 1 to each one for the newline character we’ll add to the end of each line
     *buflen = totlen;
     char *buf = malloc(totlen); //allocating required memory
     char *p = buf;
@@ -864,8 +728,6 @@ char *editorRowsToString(int *buflen) {
 void editorOpen(char *filename) {
     free(E.filename);
     E.filename = strdup(filename);
-
-    editorSelectSyntaxHighlight();
 
     FILE *fp = fopen(filename, "r"); //opens the file
     if (!fp) die("fopen");
@@ -893,12 +755,12 @@ void editorSave() {
             editorSetStatusMessage("Save aborted");
             return;
         }
-        editorSelectSyntaxHighlight();
     }
 
     int len;
     char *buf = editorRowsToString(&len);
-    int fd = open(E.filename, O_RDWR | O_CREAT, 0644); //create a file, open it for reading and writing. 0644 is standard permission for text files.
+    int fd = open(E.filename, O_RDWR | O_CREAT,
+                  0644); //create a file, open it for reading and writing. 0644 is standard permission for text files.
     if (fd != -1) {
         if (ftruncate(fd, len) != -1) { //if no error, then ftruncate sets file size to specified length.
             if (write(fd, buf, len) == len) {
@@ -940,7 +802,8 @@ void editorFindCallback(char *query, int key) {
     int i;
     for (i = 0; i < E.numrows; i++) {
         current += direction;
-        if (current == -1) current = E.numrows - 1; //causes current to go from the end of the file back to the beginning of the file or vice versa.
+        if (current == -1) current = E.numrows -
+                                     1; //causes current to go from the end of the file back to the beginning of the file or vice versa.
         else if (current == E.numrows) current = 0;
         erow *row = &E.row[current];
         char *match = strstr(row->render, query);
@@ -950,10 +813,6 @@ void editorFindCallback(char *query, int key) {
             E.cx = editorRowRxToCx(row, match - row->render);
             E.rowoff = E.numrows;
 
-            saved_hl_line = current;
-            saved_hl = malloc(row->rsize);
-            memcpy(saved_hl, row->hl, row->rsize);
-            memset(&row->hl[match - row->render], HL_MATCH, strlen(query));
             break;
         }
     }
@@ -1077,7 +936,6 @@ void initEditor() {
     E.filename = NULL;
     E.statusmsg[0] = '\0';
     E.statusmsg_time = 0;
-    E.syntax = NULL;
     if (getWindowSize(&E.screenrows, &E.screencols) == -1) die("getWindowSize");
     E.screenrows -= 2;
 }
