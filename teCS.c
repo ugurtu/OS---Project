@@ -247,6 +247,23 @@ int editorRowCxToRx(erow *row, int cx) {
 }
 
 /**
+ * This function converts render index into a char index
+ * @param row
+ * @param rx
+ * @return
+ */
+int editorRowRxToCx(erow *row, int rx) {
+    int cur_rx = 0;
+    int cx;
+    for (cx = 0; cx < row->size; cx++) { //loop through the chars
+        if (row->chars[cx] == '\t')
+            cur_rx += (KILO_TAB_STOP - 1) - (cur_rx % KILO_TAB_STOP); //calculate current cx value
+        cur_rx++;
+        if (cur_rx > rx) return cx; //if current rx hits given rx value return cx
+    }
+    return cx; //if rx is out of range
+}
+/**
  * This function uses the chars string of an erow to fill the contents of the rendered string.
  * @param row
  */
@@ -399,14 +416,14 @@ void editorInsertNewline() {
         editorInsertRow(E.cy, "", 0); //insert a new blank row
     } else {
         erow *row = &E.row[E.cy];
-        editorInsertRow(E.cy + 1, &row->chars[E.cx], row->size - E.cx);
-        row = &E.row[E.cy];
-        row->size = E.cx;
-        row->chars[row->size] = '\0';
+        editorInsertRow(E.cy + 1, &row->chars[E.cx], row->size - E.cx); //pass the characters on current row which are right of the cursor
+        row = &E.row[E.cy]; //reassign the row pointer
+        row->size = E.cx; //cut off current rows content by setting size to the position of the cursor
+        row->chars[row->size] = '\0'; //signifies end of line
         editorUpdateRow(row);
     }
     E.cy++;
-    E.cx = 0;
+    E.cx = 0; //move cursor to beginning of row
 }
 
 /*** append buffer ***/
@@ -583,32 +600,40 @@ void editorSetStatusMessage(const char *fmt, ...) {
 }
 
 /*** input ***/
-
-char *editorPrompt(char *prompt) {
+/**
+ * This function prompts the user to input a filename when saving a new file displayed in the status bar.
+ * @param prompt
+ * @return
+ */
+char *editorPrompt(char *prompt,void (*callback)(char *, int)) {
     size_t bufsize = 128;
-    char *buf = malloc(bufsize);
+    char *buf = malloc(bufsize); //input is stored in buf which is dynamically allocated
     size_t buflen = 0;
     buf[0] = '\0';
-    while (1) {
-        editorSetStatusMessage(prompt, buf);
-        editorRefreshScreen();
-        int c = readKey();
-        if (c == '\x1b') {
+    while (1) { //infinite loop
+        editorSetStatusMessage(prompt, buf); //sets status message
+        editorRefreshScreen(); //refresh screen
+        int c = readKey(); //waits for keypress
+        if (c == DEL_KEY || c == CTRL_KEY('h') || c == BACKSPACE) {
+            if (buflen != 0) buf[--buflen] = '\0';
+        }
+        else if (c == '\x1b') { //if escape is pressed
             editorSetStatusMessage("");
-            free(buf);
+            if (callback) callback(buf, c);
+            free(buf); //free the buf
             return NULL;
-        } else if (c == '\r') {
-            if (buflen != 0) {
-                editorSetStatusMessage("");
-                return buf;
+        } else if (c == '\r') { //when enter pressed
+            if (buflen != 0) { //not empty
+                editorSetStatusMessage(""); //status message cleared
+                if (callback) callback(buf, c); //if we dont want to use callpack we can just pass null
+                return buf; //input returned
             }
-        } else if (!iscntrl(c) && c < 128) {
-            if (buflen == bufsize - 1) {
-                bufsize *= 2;
-                buf = realloc(buf, bufsize);
+        } else if (!iscntrl(c) && c < 128) { //if printable char is entered and also test if char has value less than 128 to check if special char
+            if (buflen == bufsize - 1) { //if buflen reached maximum capacity
+                buf = realloc(buf, bufsize); //allocate the amount of memory before appending to buf
             }
-            buf[buflen++] = c;
-            buf[buflen] = '\0';
+            buf[buflen++] = c; //append to buf
+            buf[buflen] = '\0'; //signify end
         }
     }
 }
