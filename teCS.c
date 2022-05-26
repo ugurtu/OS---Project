@@ -21,7 +21,7 @@
 #define KILO_VERSION "0.0.1"
 #define KILO_TAB_STOP 8
 
-#define CTRL_KEY(k) ((k) & 0x1f) //allows to quit the program with a ctrl-keymakro
+#define CTRL_KEY(k) ((k) & 0x1f) //allows to quit the program with a ctrl-key macro
 
 enum editorKey {
     ARROW_LEFT = 1000,
@@ -37,7 +37,7 @@ enum editorKey {
 
 /*** data ***/
 /**
- * erow stores line of text as a pointer to the dynamicallyallocated char data and a lenght.
+ * erow stores line of text as a pointer to the dynamically-allocated char data and a length.
  */
 typedef struct erow {
     int size;
@@ -232,7 +232,8 @@ int editorRowCxToRx(erow *row, int cx) {
     int j;
     for (j = 0; j < cx; j++) { //loop through all the characters left of cx
         if (row->chars[j] == '\t')
-            rx += (KILO_TAB_STOP - 1) - (rx % KILO_TAB_STOP); //substract the amount of columns we are right of last tab stop from amount of columns to the left of next tab stop.
+            rx += (KILO_TAB_STOP - 1) - (rx %
+                                         KILO_TAB_STOP); //subtract the amount of columns we are right of last tab stop from amount of columns to the left of next tab stop.
         rx++; // this gets us to the next tab stop
     }
     return rx;
@@ -345,18 +346,19 @@ void editorScroll() {
 void editorDrawStatusBar(struct abuf *ab) {
     abAppend(ab, "\x1b[7m", 4);
     char status[80], rstatus[80];
-    int len = snprintf(status, sizeof(status), "%.20s - %d lines", //Up to 20 characters of the file name is displayed & number of lines
-                       E.filename ? E.filename : "[No Name]", E.numrows); //If the file has no name, then we just display "No Name"
-    int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d", //shows the current line number on the right edge of the window
-                        E.cy + 1, E.numrows); //have to add +1 because e.cy is indexed with 0
-    if (len > E.screencols) len = E.screencols; //cuts the status string short if it doesnt fit in the window
+    int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
+                       E.filename ? E.filename : "[No Name]", E.numrows,
+                       E.dirty ? "(modified)" : "");
+    int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d",
+                        E.cy + 1, E.numrows);
+    if (len > E.screencols) len = E.screencols;
     abAppend(ab, status, len);
     while (len < E.screencols) {
-        if (E.screencols - len == rlen) { //if lenght are equal to status string
-            abAppend(ab, rstatus, rlen); //print the status and break
+        if (E.screencols - len == rlen) {
+            abAppend(ab, rstatus, rlen);
             break;
         } else {
-            abAppend(ab, " ", 1); //else print spaces as long as we get to the point where status is againts edge of screen.
+            abAppend(ab, " ", 1);
             len++;
         }
     }
@@ -493,6 +495,36 @@ void editorMoveCursor(int key) {
     }
 }
 
+/**
+ * This function converts our array of erow structs into a single string, so that its ready
+ * to be written out to a file.
+ * @param buflen saves the lenght of text
+ * @return buf
+ */
+char *editorRowsToString(int *buflen) {
+    int totlen = 0;
+    int j;
+    for (j = 0; j < E.numrows; j++)
+        totlen += E.row[j].size + 1; //adds up the lengths of each row of text and adding 1 to each one for the newline character we’ll add to the end of each line
+    *buflen = totlen;
+    char *buf = malloc(totlen); //allocating required memory
+    char *p = buf;
+    for (j = 0; j < E.numrows; j++) {
+        memcpy(p, E.row[j].chars, E.row[j].size); //copy the contents of each row to the end of the buffer
+        p += E.row[j].size;
+        *p = '\n'; //appending a new line character after each row
+        p++;
+    }
+    return buf;
+}
+
+/**
+ * This method opens and reads a file from the disk. It takes the filename and opens the file.
+ * @param filename file which will be opened and red.
+ */
+void editorOpen(char *filename) {
+    free(E.filename);
+    E.filename = strdup(filename);
 
 /**
  * This function waits for a keypress, and then handles it.
@@ -514,9 +546,8 @@ void processKeyPress() {
             break;
 
         case PAGE_UP:
-        case PAGE_DOWN:
-        {
-            if (c == PAGE_UP) { //alows to scroll up
+        case PAGE_DOWN: {
+            if (c == PAGE_UP) { //allows to scroll up
                 E.cy = E.rowoff;
             } else if (c == PAGE_DOWN) { //allows to scroll down
                 E.cy = E.rowoff + E.screenrows - 1;
