@@ -743,12 +743,16 @@ void processKeyPress() {
             break;
 
         case CTRL_KEY('q'):
-            if (E.dirty && quit_times > 0) {
+            if (E.dirty && (quit_times > 0)) {
                 editorSetStatusMessage("WARNING!!! File has unsaved changes. "
-                                       "Press Ctrl-Q %d one more times to quit.", quit_times); //warns the user about unsaved changes
+                                       "Press Ctrl-Q %d more times to quit.", quit_times);
                 quit_times--;
                 return;
             }
+            write(STDOUT_FILENO, "\x1b[2J", 4);
+            write(STDOUT_FILENO, "\x1b[H", 3);
+            exit(0);
+            exit(0);
             break;
 
         case CTRL_KEY('s'): //save key which saves the file
