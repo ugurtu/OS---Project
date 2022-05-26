@@ -23,7 +23,7 @@
 #define KILO_TAB_STOP 8
 #define KILO_QUIT_TIMES 3
 
-#define CTRL_KEY(k) ((k) & 0x1f) //allows to quit the program with a ctrl-key macro
+#define CTRL_KEY(k) ((k) & 0x1f)//allows to quit the program with a ctrl-key macro
 
 enum editorKey {
     BACKSPACE = 127, //ascii value for delete
@@ -273,14 +273,15 @@ void editorUpdateRow(erow *row) {
 
 /**
  * This function allocates space for a new erow, and then copies the given string
- * to a new erow at the end of the E.row array.
- * @param s line
- * @param len of line
+ * to a new erow at the end of the E.row array. It inserts a row at the index specified by the new argument.
+ * @param at
+ * @param s
+ * @param len
  */
 void editorInsertRow(int at, char *s, size_t len) {
-    if (at < 0 || at > E.numrows) return;
-    E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1));
-    memmove(&E.row[at + 1], &E.row[at], sizeof(erow) * (E.numrows - at));
+    if (at < 0 || at > E.numrows) return; //validate at
+    E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1)); //allocate memory for one more erow
+    memmove(&E.row[at + 1], &E.row[at], sizeof(erow) * (E.numrows - at)); //make room at the specified index for the new row
 
     E.row[at].size = len;
     E.row[at].chars = malloc(len + 1);
@@ -295,14 +296,22 @@ void editorInsertRow(int at, char *s, size_t len) {
     E.dirty++;
 }
 
+/**
+ * This function frees the memory owned by erow.
+ * @param row
+ */
 void editorFreeRow(erow *row) {
     free(row->render);
     free(row->chars);
 }
+/**
+ * This function deletes the erow.
+ * @param at
+ */
 void editorDelRow(int at) {
-    if (at < 0 || at >= E.numrows) return;
-    editorFreeRow(&E.row[at]);
-    memmove(&E.row[at], &E.row[at + 1], sizeof(erow) * (E.numrows - at - 1));
+    if (at < 0 || at >= E.numrows) return; //validate the at index
+    editorFreeRow(&E.row[at]); //free memory owned by the row
+    memmove(&E.row[at], &E.row[at + 1], sizeof(erow) * (E.numrows - at - 1)); //overwrite the deleted row struct with rest of rowes which come after
     E.numrows--;
     E.dirty++;
 }
@@ -319,42 +328,51 @@ void editorRowInsertChar(erow *row, int at, int c) {
     memmove(&row->chars[at + 1], &row->chars[at], row->size - at + 1); //memmove makes room for the new character
     row->size++;
     row->chars[at] = c; //assign the character to its position in the chars array
-    editorUpdateRow(row); //updates fields with the new row content
+    editorUpdateRow(row); //Update fields with the new row content
     E.dirty++;
 }
 
+/**
+ * This function appends a string to the end of the row.
+ * @param row
+ * @param s
+ * @param len
+ */
 void editorRowAppendString(erow *row, char *s, size_t len) {
-    row->chars = realloc(row->chars, row->size + len + 1);
-    memcpy(&row->chars[row->size], s, len);
-    row->size += len;
+    row->chars = realloc(row->chars, row->size + len + 1); //allocate specified memory for row
+    memcpy(&row->chars[row->size], s, len); //copy the given string to the end of the contents
+    row->size += len; //update length
     row->chars[row->size] = '\0';
     editorUpdateRow(row);
     E.dirty++;
 }
 
 /**
- *
+ * This function deletes a character in a row.
  * @param row
  * @param at
  */
 void editorRowDelChar(erow *row, int at) {
     if (at < 0 || at >= row->size) return;
-    memmove(&row->chars[at], &row->chars[at + 1], row->size - at);
-    row->size--;
-    editorUpdateRow(row);
+    memmove(&row->chars[at], &row->chars[at + 1], row->size - at); //overwrites the deleted character with the characters that come after it
+    row->size--; //decrement the row size
+    editorUpdateRow(row); //updates the rows
     E.dirty++;
 }
+/**
+ * This function deletes the character left to the cursor.
+ */
 void editorDelChar() {
-    if (E.cy == E.numrows) return;
-    if (E.cx == 0 && E.cy == 0) return;
-    erow *row = &E.row[E.cy];
-    if (E.cx > 0) {
-        editorRowDelChar(row, E.cx - 1);
+    if (E.cy == E.numrows) return; //if the cursor is past the end of file, nothing to delete.
+    if (E.cx == 0 && E.cy == 0) return; //if cursor is at the beginning of the first line, nothing to do.
+    erow *row = &E.row[E.cy]; //gets the erow the cursor is on
+    if (E.cx > 0) { //if there is a character to the left of the cursor
+        editorRowDelChar(row, E.cx - 1); //delete the character and move the cursor one to the left
         E.cx--;
     } else {
-        E.cx = E.row[E.cy - 1].size;
-        editorRowAppendString(&E.row[E.cy - 1], row->chars, row->size);
-        editorDelRow(E.cy);
+        E.cx = E.row[E.cy - 1].size; //set E.cx to the end of the contents of the previous row before appending
+        editorRowAppendString(&E.row[E.cy - 1], row->chars, row->size); //append to the previous row
+        editorDelRow(E.cy); //delete the row
         E.cy--;
     }
 }
@@ -373,9 +391,12 @@ void editorInsertChar(int c) {
     E.cx++; //moving the cursor forward, so that the next character we insert comes after the just inserted character
 }
 
+/**
+ * This function allows us to add a new line or break an existing line. This is done using the Enter key.
+ */
 void editorInsertNewline() {
-    if (E.cx == 0) {
-        editorInsertRow(E.cy, "", 0);
+    if (E.cx == 0) { //If we are at the beginning of a line
+        editorInsertRow(E.cy, "", 0); //insert a new blank row
     } else {
         erow *row = &E.row[E.cy];
         editorInsertRow(E.cy + 1, &row->chars[E.cx], row->size - E.cx);
@@ -692,7 +713,7 @@ void editorSave() {
     }
     int len;
     char *buf = editorRowsToString(&len);
-    int fd = open(E.filename, O_RDWR | O_CREAT, 0644); //create a file, open it for reading and writing. 0644 is standart permission for text files.
+    int fd = open(E.filename, O_RDWR | O_CREAT, 0644); //create a file, open it for reading and writing. 0644 is standard permission for text files.
     if (fd != -1) {
         if (ftruncate(fd, len) != -1) { //if no error, then ftruncate sets file size to specified length.
             if (write(fd, buf, len) == len) {
@@ -774,11 +795,11 @@ void processKeyPress() {
             break;
 
         default:
-            editorInsertChar(c); //any keypress which isnt mapped will be inserted directly
+            editorInsertChar(c); //any keypress which isn't mapped will be inserted directly
             break;
     }
 
-    quit_times = KILO_QUIT_TIMES; //if user presses any other key then ctrl-quit, the it gets resetet back to 3
+    quit_times = KILO_QUIT_TIMES; //if user presses any other key then ctrl-quit, then it gets reset back to 3
 }
 
 /*** init ***/
