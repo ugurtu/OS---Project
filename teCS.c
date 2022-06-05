@@ -96,7 +96,7 @@ void die(const char *s) {
  * This method returns the terminal back to its normal state. That means restoring the terminals original
  * attributes when we exit the program. We store the original terminal attributes in orig_termios.
  */
-void deactivateRawMode() {
+void deactivateUnprocessedMode() {
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1)
         die("tcsetattr");
 }
@@ -108,10 +108,10 @@ void deactivateRawMode() {
  * they will by applied to the terminal by the tcsetattr() method. The TCSAFLUSH argument waits for
  * all pending output to be written to the terminal, and also discards any input that hasn't been red.
  */
-void activateRawMode() {
+void activateUnprocessedMode() {
     if (tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) die("tcgetattr");
 
-    atexit(deactivateRawMode);
+    atexit(deactivateUnprocessedMode);
 
     struct termios raw_input = E.orig_termios;
     raw_input.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON); //turning off more flags like underneath
@@ -273,7 +273,7 @@ int editorRowRxToCx(erow *row, int rx) {
  * This function uses the chars string of an erow to fill the contents of the rendered string.
  * @param row
  */
-void editorUpdateRow(erow *row) {
+void updateRow(erow *row) {
     int tabs = 0;
     int j;
     for (j = 0; j < row->size; j++)
@@ -301,7 +301,7 @@ void editorUpdateRow(erow *row) {
  * @param s
  * @param len
  */
-void editorInsertRow(int at, char *s, size_t len) {
+void insertRow(int at, char *s, size_t len) {
     if (at < 0 || at > E.numrows) return; //validate at
     E.row = realloc(E.row, sizeof(erow) * (E.numrows + 1)); //allocate memory for one more erow
     memmove(&E.row[at + 1], &E.row[at],
@@ -355,7 +355,7 @@ void editorRowInsertChar(erow *row, int at, int c) {
     memmove(&row->chars[at + 1], &row->chars[at], row->size - at + 1); //memmove makes room for the new character
     row->size++;
     row->chars[at] = c; //assign the character to its position in the chars array
-    editorUpdateRow(row); //Update fields with the new row content
+    updateRow(row); //Update fields with the new row content
     E.dirty++;
 }
 
@@ -423,17 +423,17 @@ void insertChar(int c) {
 /**
  * This function allows us to add a new line or break an existing line. This is done using the Enter key.
  */
-void editorInsertNewline() {
+void insertNewline() {
     if (E.cx == 0) { //If we are at the beginning of a line
-        editorInsertRow(E.cy, "", 0); //insert a new blank row
+        insertRow(E.cy, "", 0); //insert a new blank row
     } else {
         erow *row = &E.row[E.cy];
-        editorInsertRow(E.cy + 1, &row->chars[E.cx],
+        insertRow(E.cy + 1, &row->chars[E.cx],
                         row->size - E.cx); //pass the characters on current row which are right of the cursor
         row = &E.row[E.cy]; //reassign the row pointer
         row->size = E.cx; //cut off current rows content by setting size to the position of the cursor
         row->chars[row->size] = '\0'; //signifies end of line
-        editorUpdateRow(row);
+        updateRow(row);
     }
     E.cy++;
     E.cx = 0; //move cursor to beginning of row
@@ -441,7 +441,7 @@ void editorInsertNewline() {
 
 /*** append buffer ***/
 
-struct abuf {
+struct abuffer {
     char *b; //pointer to our buffer in memory
     int len;
 };
@@ -454,7 +454,7 @@ struct abuf {
  * @param s string
  * @param len of string
  */
-void abAppend(struct abuf *ab, const char *s, int len) {
+void abAppend(struct abuffer *ab, const char *s, int len) {
     char *new = realloc(ab->b, ab->len +
                                len); //alloc enough memory for the string. Current size of string + size of appending string
     if (new == NULL) return;
@@ -467,7 +467,7 @@ void abAppend(struct abuf *ab, const char *s, int len) {
  * This function deallocates the dynamic memory.
  * @param ab append buffer
  */
-void abFree(struct abuf *ab) {
+void aBufferFree(struct abuffer *ab) {
     free(ab->b);
 }
 
@@ -499,7 +499,7 @@ void scroll() {
  * This function gives us useful information about the file
  * @param ab
  */
-void editorDrawStatusBar(struct abuf *ab) {
+void editorDrawStatusBar(struct abuffer *ab) {
     abAppend(ab, "\x1b[7m", 4);
     char status[80], rstatus[80];
     int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
@@ -527,7 +527,7 @@ void editorDrawStatusBar(struct abuf *ab) {
  * This function draws a message bar and then displays that in that bar
  * @param ab
  */
-void editorDrawMessageBar(struct abuf *ab) {
+void editorDrawMessageBar(struct abuffer *ab) {
     abAppend(ab, "\x1b[K", 3);
     int msglen = strlen(E.statusmsg);
     if (msglen > E.screencols) msglen = E.screencols;
@@ -538,7 +538,7 @@ void editorDrawMessageBar(struct abuf *ab) {
 /**
  * This functions draws a tilde at every row like vim.
  */
-void editorDrawRows(struct abuf *ab) {
+void editorDrawRows(struct abuffer *ab) {
     int y;
     for (y = 0; y < E.screenrows; y++) {
         int filerow = y + E.rowoff;
@@ -574,8 +574,8 @@ void editorDrawRows(struct abuf *ab) {
  * This function renders the interface.
  */
 void editorRefreshScreen() {
-    editorScroll();
-    struct abuf ab = ABUF_INIT; //init buffer
+    scroll();
+    struct abuffer ab = ABUF_INIT; //init buffer
 
     abAppend(&ab, "\x1b[?25l", 6); //hide cursor
     abAppend(&ab, "\x1b[H", 3);
@@ -594,7 +594,7 @@ void editorRefreshScreen() {
     abAppend(&ab, "\x1b[?25h", 6); //show cursor
 
     write(STDOUT_FILENO, ab.b, ab.len); //whole screen updates at once
-    abFree(&ab);
+    aBufferFree(&ab);
 }
 
 /**
@@ -737,7 +737,7 @@ void editorOpen(char *filename) {
         while (linelen > 0 && (line[linelen - 1] == '\n' ||
                                line[linelen - 1] == '\r'))
             linelen--;
-        editorInsertRow(E.numrows, line, linelen);
+        insertRow(E.numrows, line, linelen);
     }
     free(line); //freeing from allocation
     fclose(fp);
@@ -847,19 +847,18 @@ void processKeyPress() {
 
     switch (c) {
         case '\r': //Enter key
-            editorInsertNewline();
+            insertNewline();
             break;
 
         case CTRL_KEY('q'):
             if (E.dirty && (quit_times > 0)) {
-                editorSetStatusMessage("WARNING!!! File has unsaved changes. "
-                                       "Press Ctrl-Q %d more times to quit.", quit_times);
+                editorSetStatusMessage(RED"⛔ File has unsaved changes. "
+                                       "Press Ctrl-Q %d more times to quit."reset, quit_times);
                 quit_times--;
                 return;
             }
             write(STDOUT_FILENO, "\x1b[2J", 4);
             write(STDOUT_FILENO, "\x1b[H", 3);
-            exit(0);
             exit(0);
             break;
 
@@ -945,12 +944,12 @@ void initEditor() {
  * @return read() if there are bytes that it red. else 0 if it reaches the end of the file.
  */
 int main(int argc, char *argv[]) {
-    activateRawMode();
+    activateUnprocessedMode();
     initEditor();
     if (argc >= 2) {
         editorOpen(argv[1]); //sali
     }
-    editorSetStatusMessage("HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
+    editorSetStatusMessage("HELP: Ctrl-S =\uD83DDCBE | Ctrl-Q = quit | Ctrl-F = 1F50D FE0E");
 
     while (1) {
         editorRefreshScreen();
