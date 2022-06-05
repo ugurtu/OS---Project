@@ -19,9 +19,11 @@
 
 /*** defines ***/
 
-#define KILO_VERSION "0.0.1"
-#define KILO_TAB_STOP 8
-#define KILO_QUIT_TIMES 3
+#define TECS_VERSION "0.0.1"
+#define TECS_TAB_STOP 8 //length of a tab. 8 bytes
+#define TECS_QUIT_TIMES 1
+#define RED "\033[0;31m"
+#define reset "\033[0m"
 
 #define CTRL_KEY(k) ((k) & 0x1f)//allows to quit the program with a ctrl-key macro
 
@@ -127,7 +129,7 @@ void activateRawMode() {
  * This function waits for one keypress and returns it.
  * @return the keypress
  */
-int readKey() {
+int readKeypress() {
     int nread;
     char c;
     while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
@@ -195,7 +197,7 @@ int readKey() {
  * @param cols
  * @return 0 if error
  */
-int getCursorPosition(int *rows, int *cols) {
+int getPosition(int *rows, int *cols) {
     char buf[32];
     unsigned int i = 0;
     if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1; //ask for the cursor position
@@ -222,16 +224,13 @@ int getWindowSize(int *rows, int *cols) {
     struct winsize ws;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
         if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1; //moves the cursor to the right bottom
-        return getCursorPosition(rows, cols);
+        return getPosition(rows, cols);
     } else {
         *cols = ws.ws_col;
         *rows = ws.ws_row;
         return 0;
     }
 }
-
-/*** syntax highlighting ***/
-
 
 /*** row operations ***/
 /**
@@ -245,8 +244,8 @@ int editorRowCxToRx(erow *row, int cx) {
     int j;
     for (j = 0; j < cx; j++) { //loop through all the characters left of cx
         if (row->chars[j] == '\t')
-            rx += (KILO_TAB_STOP - 1) - (rx %
-                                         KILO_TAB_STOP); //subtract the amount of columns we are right of last tab stop from amount of columns to the left of next tab stop.
+            rx += (TECS_TAB_STOP - 1) - (rx %
+                                         TECS_TAB_STOP); //subtract the amount of columns we are right of last tab stop from amount of columns to the left of next tab stop.
         rx++; // this gets us to the next tab stop
     }
     return rx;
@@ -263,7 +262,7 @@ int editorRowRxToCx(erow *row, int rx) {
     int cx;
     for (cx = 0; cx < row->size; cx++) { //loop through the chars
         if (row->chars[cx] == '\t')
-            cur_rx += (KILO_TAB_STOP - 1) - (cur_rx % KILO_TAB_STOP); //calculate current cx value
+            cur_rx += (TECS_TAB_STOP - 1) - (cur_rx % TECS_TAB_STOP); //calculate current cx value
         cur_rx++;
         if (cur_rx > rx) return cx; //if current rx hits given rx value return cx
     }
@@ -280,12 +279,12 @@ void editorUpdateRow(erow *row) {
     for (j = 0; j < row->size; j++)
         if (row->chars[j] == '\t') tabs++; //we loop through the chars of the row
     free(row->render);
-    row->render = malloc(row->size + tabs * (KILO_TAB_STOP - 1) + 1); //allocate memory for render(count of tabs)
+    row->render = malloc(row->size + tabs * (TECS_TAB_STOP - 1) + 1); //allocate memory for render(count of tabs)
     int idx = 0;
     for (j = 0; j < row->size; j++) {
         if (row->chars[j] == '\t') { //checks whether the current character is a tab
             row->render[idx++] = ' '; // if it is, we append one space
-            while (idx % KILO_TAB_STOP != 0)
+            while (idx % TECS_TAB_STOP != 0)
                 row->render[idx++] = ' '; //append spaces until we get a tab stop, which is a column divisible by 8
         } else {
             row->render[idx++] = row->chars[j];
@@ -315,7 +314,7 @@ void editorInsertRow(int at, char *s, size_t len) {
 
     E.row[at].rsize = 0;
     E.row[at].render = NULL;
-    editorUpdateRow(&E.row[at]);
+    updateRow(&E.row[at]);
 
     E.numrows++;
     E.dirty++;
@@ -371,7 +370,7 @@ void editorRowAppendString(erow *row, char *s, size_t len) {
     memcpy(&row->chars[row->size], s, len); //copy the given string to the end of the contents
     row->size += len; //update length
     row->chars[row->size] = '\0';
-    editorUpdateRow(row);
+    updateRow(row);
     E.dirty++;
 }
 
@@ -385,7 +384,7 @@ void editorRowDelChar(erow *row, int at) {
     memmove(&row->chars[at], &row->chars[at + 1],
             row->size - at); //overwrites the deleted character with the characters that come after it
     row->size--; //decrement the row size
-    editorUpdateRow(row); //updates the rows
+    updateRow(row); //updates the rows
     E.dirty++;
 }
 
@@ -413,9 +412,9 @@ void editorDelChar() {
  * into the position that the cursor is at.
  * @param c position in the array
  */
-void editorInsertChar(int c) {
+void insertChar(int c) {
     if (E.cy == E.numrows) { //if condition is true, then we append a new row to the file before inserting character
-        editorInsertRow(E.numrows, "", 0);
+        insertRow(E.numrows, "", 0);
     }
     editorRowInsertChar(&E.row[E.cy], E.cx, c);
     E.cx++; //moving the cursor forward, so that the next character we insert comes after the just inserted character
@@ -450,7 +449,7 @@ struct abuf {
 #define ABUF_INIT {NULL, 0} //acts as a constructor
 
 /**
- * This function appends the string to an abuf buffer
+ * This function appends the string to an abuffer buffer
  * @param ab append buffer
  * @param s string
  * @param len of string
@@ -477,7 +476,7 @@ void abFree(struct abuf *ab) {
  * This function checks if the users cursor has moved outside of the visible window
  * and adjusts E.rowoff so that the cursor is just inside the visible window.
  */
-void editorScroll() {
+void scroll() {
     E.rx = 0;
     if (E.cy < E.numrows) {
         E.rx = editorRowCxToRx(&E.row[E.cy], E.cx);
@@ -547,7 +546,7 @@ void editorDrawRows(struct abuf *ab) {
             if (E.numrows == 0 && y == E.screenrows / 3) {
                 char welcome[80];
                 int welcomelen = snprintf(welcome, sizeof(welcome),
-                                          "Kilo editor -- version %s", KILO_VERSION);
+                                          "TECS -- version %s", TECS_VERSION);
                 if (welcomelen > E.screencols) welcomelen = E.screencols;
                 int padding = (E.screencols - welcomelen) / 2;
                 if (padding) {
@@ -627,7 +626,7 @@ char *editorPrompt(char *prompt, void (*callback)(char *, int)) {
     while (1) { //infinite loop
         editorSetStatusMessage(prompt, buf); //sets status message
         editorRefreshScreen(); //refresh screen
-        int c = readKey(); //waits for keypress
+        int c = readKeypress(); //waits for keypress
         if (c == DEL_KEY || c == CTRL_KEY('h') || c == BACKSPACE) {
             if (buflen != 0) buf[--buflen] = '\0';
         } else if (c == '\x1b') { //if escape is pressed
@@ -843,9 +842,8 @@ void editorFind() {
  * This function waits for a keypress, and then handles it.
  */
 void processKeyPress() {
-    static int quit_times = KILO_QUIT_TIMES; //tracks how many times the user presses ctrl-q
-
-    int c = readKey();
+    static int quit_times = TECS_QUIT_TIMES; //tracks how many times the user presses ctrl-q
+    int c = readKeypress();
 
     switch (c) {
         case '\r': //Enter key
@@ -913,11 +911,11 @@ void processKeyPress() {
             break;
 
         default:
-            editorInsertChar(c); //any keypress which isn't mapped will be inserted directly
+            insertChar(c); //any keypress which isn't mapped will be inserted directly
             break;
     }
 
-    quit_times = KILO_QUIT_TIMES; //if user presses any other key then ctrl-quit, then it gets reset back to 3
+    quit_times = TECS_QUIT_TIMES; //if user presses any other key then ctrl-quit, then it gets reset back to 3
 }
 
 /*** init ***/
