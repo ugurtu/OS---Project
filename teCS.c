@@ -949,7 +949,7 @@ int main(int argc, char *argv[]) {
     if (argc >= 2) {
         editorOpen(argv[1]); //sali
     }
-    editorSetStatusMessage("HELP: Ctrl-S =\uD83DDCBE | Ctrl-Q = quit | Ctrl-F = 1F50D FE0E");
+    editorSetStatusMessage("HELP: Ctrl-S =\uD83D\uDCBE | Ctrl-Q = quit | Ctrl-F = 1F50D FE0E");
 
     while (1) {
         editorRefreshScreen();
