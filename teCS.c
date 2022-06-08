@@ -116,7 +116,7 @@ void activateUnprocessedMode() {
     struct termios raw_input = E.orig_termios;
     raw_input.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON); //turning off more flags like underneath
     raw_input.c_oflag &= ~(OPOST); //turns off all output processing features
-    raw_input.c_cflag |= (CS8);
+    raw_input.c_cflag |= (CS8); //Bitwise OR assignment
     raw_input.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG); //disables Ctrl-(C,Z,S,Q,V)
     raw_input.c_cc[VMIN] = 0; //read() returns as soon as there is any input to read
     raw_input.c_cc[VTIME] = 1; //100 milliseconds wait before read() returns
