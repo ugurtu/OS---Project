@@ -12,10 +12,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
-#include <sys/types.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
+#include <locale.h>
 
 /*** defines ***/
 
@@ -200,7 +200,9 @@ int readKeypress() {
 int getPosition(int *rows, int *cols) {
     char buf[32];
     unsigned int i = 0;
-    if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4) return -1; //ask for the cursor position
+    if (write(STDOUT_FILENO, "\x1b[6n", 4) != 4) {
+        return -1; //ask for the cursor position
+    }
     while (i < sizeof(buf) - 1) {
         if (read(STDIN_FILENO, &buf[i], 1) != 1) break;
         if (buf[i] == 'R') break; //we read the response into a buffer
@@ -604,7 +606,7 @@ void editorRefreshScreen() {
  */
 void editorSetStatusMessage(const char *fmt, ...) {
 
-
+    setlocale(LC_ALL, "en_US.utf8");
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(E.statusmsg, sizeof(E.statusmsg), fmt, ap); //status message with number of seconds
@@ -727,7 +729,7 @@ char *editorRowsToString(int *buflen) {
 void editorOpen(char *filename) {
     free(E.filename);
     E.filename = strdup(filename);
-
+    setlocale(LC_ALL,"de-CH.utf8");
     FILE *fp = fopen(filename, "r"); //opens the file
     if (!fp) die("fopen");
     char *line = NULL;
@@ -852,13 +854,14 @@ void processKeyPress() {
 
         case CTRL_KEY('q'):
             if (E.dirty && (quit_times > 0)) {
-                editorSetStatusMessage(RED"⛔ File has unsaved changes. "
-                                       "Press Ctrl-Q %d more times to quit."reset, quit_times);
+                editorSetStatusMessage("\U000026A0 File has unsaved changes. "
+                                       "Press Ctrl-Q %d more times to quit.", quit_times);
                 quit_times--;
                 return;
             }
             write(STDOUT_FILENO, "\x1b[2J", 4);
             write(STDOUT_FILENO, "\x1b[H", 3);
+            system("clear");
             exit(0);
             break;
 
@@ -937,6 +940,15 @@ void initEditor() {
     E.screenrows -= 2;
 }
 
+char* concat(const char *s1, const char *s2)
+{
+    char *result = malloc(strlen(s1) + strlen(s2) + 1); // +1 for the null-terminator
+    // in real code you would check for errors in malloc here
+    strcpy(result, s1);
+    strcat(result, s2);
+    return result;
+}
+
 /**
  * The keyboard input gets red into the variable c.
  * The while loop reads 1 byte from the standard input into c. It keeps doing it
@@ -947,9 +959,15 @@ int main(int argc, char *argv[]) {
     activateUnprocessedMode();
     initEditor();
     if (argc >= 2) {
-        editorOpen(argv[1]); //sali
+        editorOpen(argv[1]);
     }
-    editorSetStatusMessage("HELP: Ctrl-S =\uD83D\uDCBE | Ctrl-Q = quit | Ctrl-F = 1F50D FE0E");
+    time_t rawtime;
+    struct tm *info;
+    time( &rawtime );
+    info = localtime(&rawtime);
+    //editorSetStatusMessage("\U0001F6C8: Ctrl-S = \U0001F4BE |Ctrl-Q = \U0001F6D1 | Ctrl-F = \U0001F50D\t");
+    char* s = concat("\U00002139: Ctrl-S = \U0001F4BE |Ctrl-Q = \U0001F6AB | Ctrl-F =\U0001F50D |\U000023F1 =",  asctime(info));
+    editorSetStatusMessage(s);
 
     while (1) {
         editorRefreshScreen();
