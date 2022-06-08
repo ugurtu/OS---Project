@@ -431,7 +431,7 @@ void insertNewline() {
     } else {
         erow *row = &E.row[E.cy];
         insertRow(E.cy + 1, &row->chars[E.cx],
-                        row->size - E.cx); //pass the characters on current row which are right of the cursor
+                  row->size - E.cx); //pass the characters on current row which are right of the cursor
         row = &E.row[E.cy]; //reassign the row pointer
         row->size = E.cx; //cut off current rows content by setting size to the position of the cursor
         row->chars[row->size] = '\0'; //signifies end of line
@@ -729,7 +729,7 @@ char *editorRowsToString(int *buflen) {
 void editorOpen(char *filename) {
     free(E.filename);
     E.filename = strdup(filename);
-    setlocale(LC_ALL,"de-CH.utf8");
+    setlocale(LC_ALL, "de-CH.utf8");
     FILE *fp = fopen(filename, "r"); //opens the file
     if (!fp) die("fopen");
     char *line = NULL;
@@ -786,7 +786,7 @@ void editorFindCallback(char *query, int key) {
     static int last_match = -1; //last match of search
     static int direction = 1; // stores direction of search
 
-    if (key == '\r' || key == '\x1b') { //checks wheter we pressed Enter or Escape
+    if (key == '\r' || key == '\x1b') { //checks whether we pressed Enter or Escape
         last_match = -1;
         direction = 1;
         return;
@@ -803,8 +803,9 @@ void editorFindCallback(char *query, int key) {
     int i;
     for (i = 0; i < E.numrows; i++) {
         current += direction;
-        if (current == -1) current = E.numrows -
-                                     1; //causes current to go from the end of the file back to the beginning of the file or vice versa.
+        if (current == -1)
+            current = E.numrows -
+                      1; //causes current to go from the end of the file back to the beginning of the file or vice versa.
         else if (current == E.numrows) current = 0;
         erow *row = &E.row[current];
         char *match = strstr(row->render, query);
@@ -940,8 +941,15 @@ void initEditor() {
     E.screenrows -= 2;
 }
 
-char* concat(const char *s1, const char *s2)
-{
+/**
+ * Function to concat two chars needed for Help
+ *
+ * @param s1 Tools
+ * @param s2 time
+ *
+ * @return concatenated string
+ */
+char *concat(const char *s1, const char *s2) {
     char *result = malloc(strlen(s1) + strlen(s2) + 1); // +1 for the null-terminator
     // in real code you would check for errors in malloc here
     strcpy(result, s1);
@@ -963,10 +971,11 @@ int main(int argc, char *argv[]) {
     }
     time_t rawtime;
     struct tm *info;
-    time( &rawtime );
+    time(&rawtime);
     info = localtime(&rawtime);
-    //editorSetStatusMessage("\U0001F6C8: Ctrl-S = \U0001F4BE |Ctrl-Q = \U0001F6D1 | Ctrl-F = \U0001F50D\t");
-    char* s = concat("\U00002139: Ctrl-S = \U0001F4BE |Ctrl-Q = \U0001F6AB | Ctrl-F =\U0001F50D |\U000023F1 =",  asctime(info));
+
+    char *s = concat("\U00002139: Ctrl-S = \U0001F4BE |Ctrl-Q = \U0001F6AB | Ctrl-F =\U0001F50D |\U000023F1 =",
+                     asctime(info));
     editorSetStatusMessage(s);
 
     while (1) {
