@@ -131,8 +131,15 @@ void activateUnprocessedMode() {
 int readKeypress() {
     int nread;
     char c;
+    /** reads one byte at a time
+     * It can take two status one is 0 which represents the end of file
+     * or it can be 1 if an errors occurs.
+     *
+     * */
     while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
-        if (nread == -1 && errno != EAGAIN) quit("read");
+        if (nread == -1 && errno != EAGAIN) {
+            quit("read");
+        };
     }
     if (c == '\x1b') {
         char seq[3];
@@ -477,6 +484,7 @@ void aBufferFree(struct aBuffer *ab) {
  * This function checks if the users cursor has moved outside of the visible window
  * and adjusts E.rowoff so that the cursor is just inside the visible window.
  */
+
 void scroll() {
     E.rx = 0;
     if (E.cy < E.numrows) {
@@ -532,8 +540,9 @@ void drawStatusBar(struct aBuffer *ab) {
     abAppend(ab, "\x1b[K", 3);
     int msglen = strlen(E.statusmsg);
     if (msglen > E.screencols) msglen = E.screencols;
-    if (msglen && time(NULL) - E.statusmsg_time < 5) //set to 5 seconds intervall
-        abAppend(ab, E.statusmsg, msglen);
+
+    abAppend(ab, E.statusmsg, msglen);
+
 }
 
 /**
@@ -592,7 +601,7 @@ void refreshScreen() {
 
     abAppend(&ab, buf, strlen(buf));
 
-    abAppend(&ab, "\x1b[?25h", 6); //show cursor
+    abAppend(&ab, "\x1b[?25h", 6); //shows cursor l hides cursor
 
     write(STDOUT_FILENO, ab.b, ab.len); //whole screen updates at once
     aBufferFree(&ab);
@@ -965,7 +974,7 @@ char *concat(const char *s1, const char *s2) {
 int main(int argc, char *argv[]) {
     activateUnprocessedMode();
     initializeEditor();
-    if (argc >= 2) {
+    if (argc == 2) {
         readFile(argv[1]);
     }
     time_t raw_time;
