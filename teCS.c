@@ -549,7 +549,7 @@ void drawStatusBar(struct aBuffer *ab) {
 /**
  * This functions draws a tilde at every row like vim.
  */
-void drawTildes(struct aBuffer *ab) {
+void drawField(struct aBuffer *ab) {
     int y;
     for (y = 0; y < E.screenrows; y++) {
         int filerow = y + E.rowoff;
@@ -591,7 +591,7 @@ void refreshScreen() {
     abAppend(&ab, "\x1b[?25l", 6); //hide cursor
     abAppend(&ab, "\x1b[H", 3);
 
-    drawTildes(&ab);
+    drawField(&ab);
     setStatusBar(&ab);
     drawStatusBar(&ab);
 
