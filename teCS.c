@@ -763,6 +763,15 @@ void saveFile() {
         E.filename = inputFileName("Save as: %s (ESC to cancel)", NULL);
         if (E.filename == NULL) {
             setStatusMessage("Save aborted");
+            sleep(1);
+            time_t raw_time;
+            struct tm *info;
+            time(&raw_time);
+            info = localtime(&raw_time);
+
+            char *s = concat("\U00002139: Ctrl-S   \U0001F4BE |Ctrl-Q   \U0001F6AB | Ctrl-F  \U0001F50D |\U000023F1  ",
+                             asctime(info));
+            setStatusMessage(s);
             return;
         }
     }
