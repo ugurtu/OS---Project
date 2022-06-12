@@ -77,6 +77,7 @@ void refreshScreen();
 
 char *inputFileName(char *prompt, void (*callback)(char *, int));
 
+char *concat(const char *s1, const char *s2);
 
 /*** terminal ***/
 /**
@@ -788,7 +789,7 @@ void saveFile() {
 
 /*** find ***/
 /**
- * This function is a callback function for our search function editorfind().
+ * This function is a callback function for our search function searchWord().
  */
 void searchCallback(char *query, int key) {
     static int last_match = -1; //last match of search
@@ -837,10 +838,18 @@ void searchWord() {
     int saved_cy = E.cy;
     int saved_coloff = E.coloff;
     int saved_rowoff = E.rowoff;
-    char *query = inputFileName("Search: %s (Use ESC/Arrows/Enter)",
+    char *word = inputFileName("Search: %s (Use ESC/Arrows/Enter)",
                                searchCallback);
-    if (query) {
-        free(query);
+    time_t raw_time;
+    struct tm *info;
+    time(&raw_time);
+    info = localtime(&raw_time);
+
+    char *s = concat("\U00002139: Ctrl-S = \U0001F4BE |Ctrl-Q = \U0001F6AB | Ctrl-F =\U0001F50D |\U000023F1 =",
+                     asctime(info));
+    setStatusMessage(s);
+    if (word) {
+        free(word);
     } else {
         E.cx = saved_cx;
         E.cy = saved_cy;
@@ -909,7 +918,6 @@ void checkKeyPress() {
         }
             break;
 
-            break;
         case ARROW_UP:
         case ARROW_DOWN:
         case ARROW_LEFT:
