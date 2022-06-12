@@ -38,6 +38,8 @@ enum keys {
     PAGE_UP,
     PAGE_DOWN
 };
+time_t raw_time;
+struct tm *info;
 
 /*** data ***/
 
@@ -114,9 +116,40 @@ void activateUnprocessedMode() {
     atexit(deactivateUnprocessedMode);
 
     struct termios raw_input = E.orig_termios;
+
+    /**
+     * c_iflag	Input options ->
+        IXON    = Enable software flow control (outgoing)
+        BRKINT  = Send a SIGINT when a break condition is detected
+        ICRNL   = Map CR to NL
+        INPCK	= Enable parity check
+        ISTRIP  = Strip parity bits
+
+     * c_oflag	Output options
+        OPOST = Postprocess output (not set = raw output)
+
+     * c_cflag	Control options
+        CS8	= 8 data bits
+
+     * c_lflag	Line options
+        ECHO   = Enable echoing of input characters
+        ICANON = Enable canonical input (else raw)
+        IEXTEN = Enable extended functions
+        ISIG = Enable SIGINTR, SIGSUSP, SIGDSUSP, and SIGQUIT signals
+
+     * c_cc	Control characters
+        VMIN  = Minimum number of characters to read
+        VTIME = Time to wait for data (tenths of seconds)
+
+     * */
     raw_input.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON); //turning off more flags like underneath
     raw_input.c_oflag &= ~(OPOST); //turns off all output processing features
     raw_input.c_cflag |= (CS8); //Bitwise OR assignment
+    /*
+     * CS8 is not a flag, it is a bit mask with multiple bits, which we set using the bitwise-OR (|)
+     * operator unlike all the flags we are turning off. It sets the character size (CS)
+     * to 8 bits per byte. On my system, it’s already set that way.
+    */
     raw_input.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG); //disables Ctrl-(C,Z,S,Q,V)
     raw_input.c_cc[VMIN] = 0; //read() returns as soon as there is any input to read
     raw_input.c_cc[VTIME] = 1; //100 milliseconds wait before read() returns
@@ -557,7 +590,7 @@ void drawField(struct aBuffer *ab) {
             if (E.numrows == 0 && y == E.screenrows / 3) {
                 char welcome[80];
                 int welcomelen = snprintf(welcome, sizeof(welcome),
-                                          "\x1b[7m teCS -- version %s", TECS_VERSION);
+                                          "\U0001F5B9 \x1b[7m teCS -- version %s", TECS_VERSION);
                 if (welcomelen > E.screencols) welcomelen = E.screencols;
                 int padding = (E.screencols - welcomelen) / 2;
                 if (padding) {
@@ -762,8 +795,6 @@ void saveFile() {
     if (E.filename == NULL) {
         E.filename = inputFileName("Save as: %s (ESC to cancel)", NULL);
         if (E.filename == NULL) {
-            setStatusMessage("Save aborted");
-            sleep(1);
             time_t raw_time;
             struct tm *info;
             time(&raw_time);
@@ -845,8 +876,8 @@ void searchCallback(char *query, int key) {
 void searchWord() {
     int saved_cx = E.cx;
     int saved_cy = E.cy;
-    int saved_coloff = E.coloff;
-    int saved_rowoff = E.rowoff;
+    int saved_colOff = E.coloff;
+    int saved_rowOff = E.rowoff;
     char *word = inputFileName("Search: %s (Use ESC/Arrows/Enter)",
                                searchCallback);
     time_t raw_time;
@@ -862,8 +893,8 @@ void searchWord() {
     } else {
         E.cx = saved_cx;
         E.cy = saved_cy;
-        E.coloff = saved_coloff;
-        E.rowoff = saved_rowoff;
+        E.coloff = saved_colOff;
+        E.rowoff = saved_rowOff;
     }
 }
 
@@ -882,7 +913,7 @@ void checkKeyPress() {
         case CTRL_KEY('q'):
             if (E.dirty && (quit_times > 0)) {
                 setStatusMessage("\U000026A0 File has unsaved changes. "
-                                       "Press Ctrl-Q %d more times to quit.", quit_times);
+                                 "Press Ctrl-Q %d more times to quit.", quit_times);
                 quit_times--;
                 return;
             }
@@ -894,6 +925,15 @@ void checkKeyPress() {
 
         case CTRL_KEY('s'): //save key which saves the file
             saveFile();
+            break;
+
+        case CTRL_KEY('i'):
+            time(&raw_time);
+            info = localtime(&raw_time);
+
+            char *s = concat("\U00002139: Ctrl-S   \U0001F4BE |Ctrl-Q   \U0001F6AB | Ctrl-F  \U0001F50D | \U000023F1 ",
+                             asctime(info));
+            setStatusMessage(s);
             break;
         case HOME_KEY:
             E.cx = 0; //moves the cursor to the left side of the screen
@@ -923,7 +963,8 @@ void checkKeyPress() {
             }
             int times = E.screenrows;
             while (times--)
-                moveCursor(c == PAGE_UP ? ARROW_UP : ARROW_DOWN);
+                moveCursor(c == PAGE_UP ? ARROW_UP
+                                        : ARROW_DOWN); //Conditional Operation It could be also done with an If Else
         }
             break;
 
@@ -934,7 +975,6 @@ void checkKeyPress() {
             moveCursor(c);
             break;
 
-        case CTRL_KEY('l'): //esc key ascii
         case '\x1b':
             break;
 
