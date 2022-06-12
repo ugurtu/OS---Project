@@ -561,13 +561,13 @@ void drawTildes(struct aBuffer *ab) {
                 if (welcomelen > E.screencols) welcomelen = E.screencols;
                 int padding = (E.screencols - welcomelen) / 2;
                 if (padding) {
-                    abAppend(ab, "~", 1);
+                    abAppend(ab, " ", 1);
                     padding--;
                 }
                 while (padding--) abAppend(ab, " ", 1);
                 abAppend(ab, welcome, welcomelen);
             } else {
-                abAppend(ab, "~", 1);
+                abAppend(ab, " ", 1);
             }
         } else {
             int len = E.row[filerow].rsize - E.coloff;
@@ -845,7 +845,7 @@ void searchWord() {
     time(&raw_time);
     info = localtime(&raw_time);
 
-    char *s = concat("\U00002139: Ctrl-S = \U0001F4BE |Ctrl-Q = \U0001F6AB | Ctrl-F =\U0001F50D |\U000023F1 =",
+    char *s = concat("\U00002139: Ctrl-S   \U0001F4BE |Ctrl-Q   \U0001F6AB | Ctrl-F  \U0001F50D |\U000023F1  ",
                      asctime(info));
     setStatusMessage(s);
     if (word) {
@@ -990,7 +990,7 @@ int main(int argc, char *argv[]) {
     time(&raw_time);
     info = localtime(&raw_time);
 
-    char *s = concat("\U00002139: Ctrl-S = \U0001F4BE |Ctrl-Q = \U0001F6AB | Ctrl-F =\U0001F50D |\U000023F1 =",
+    char *s = concat("\U00002139: Ctrl-S   \U0001F4BE |Ctrl-Q   \U0001F6AB | Ctrl-F  \U0001F50D | \U000023F1 ",
                      asctime(info));
     setStatusMessage(s);
 
