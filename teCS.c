@@ -795,8 +795,7 @@ void saveFile() {
     if (E.filename == NULL) {
         E.filename = inputFileName("Save as: %s (ESC to cancel)", NULL);
         if (E.filename == NULL) {
-            time_t raw_time;
-            struct tm *info;
+
             time(&raw_time);
             info = localtime(&raw_time);
 
@@ -1034,8 +1033,7 @@ int main(int argc, char *argv[]) {
     if (argc == 2) {
         readFile(argv[1]);
     }
-    time_t raw_time;
-    struct tm *info;
+
     time(&raw_time);
     info = localtime(&raw_time);
 
