@@ -466,19 +466,19 @@ void insertChar(int c) {
  * This function allows us to add a new line or break an existing line. This is done using the Enter key.
  */
 void insertNewline() {
-    if (E.cx == 0) { //If we are at the beginning of a line
-        insertRow(E.cy, "", 0); //insert a new blank row
-    } else {
-        erow *row = &E.row[E.cy];
-        insertRow(E.cy + 1, &row->chars[E.cx],
-                  row->size - E.cx); //pass the characters on current row which are right of the cursor
-        row = &E.row[E.cy]; //reassign the row pointer
-        row->size = E.cx; //cut off current rows content by setting size to the position of the cursor
-        row->chars[row->size] = '\0'; //signifies end of line
-        updateRow(row);
-    }
-    E.cy++;
-    E.cx = 0; //move cursor to beginning of row
+   if (E.cx == 0) { //If we are at the beginning of a line
+       insertRow(E.cy, "", 0); //insert a new blank row
+   } else {
+       erow *row = &E.row[E.cy];
+       insertRow(E.cy + 1, &row->chars[E.cx],
+                 row->size - E.cx); //pass the characters on current row which are right of the cursor
+       row = &E.row[E.cy]; //reassign the row pointer
+       row->size = E.cx; //cut off current rows content by setting size to the position of the cursor
+       row->chars[row->size] = '\0'; //signifies end of line
+       updateRow(row);
+   }
+   E.cy++;
+   E.cx = 0; //move cursor to beginning of row
 }
 
 /*** append buffer ***/
@@ -590,7 +590,7 @@ void drawField(struct aBuffer *ab) {
             if (E.numrows == 0 && y == E.screenrows / 3) {
                 char welcome[80];
                 int welcomelen = snprintf(welcome, sizeof(welcome),
-                                          "\U0001F5B9 \x1b[7m teCS -- version %s", TECS_VERSION);
+                                          "\U0001F4DD \x1b[7m teCS -- version %s", TECS_VERSION);
                 if (welcomelen > E.screencols) welcomelen = E.screencols;
                 int padding = (E.screencols - welcomelen) / 2;
                 if (padding) {
@@ -879,8 +879,6 @@ void searchWord() {
     int saved_rowOff = E.rowoff;
     char *word = inputFileName("Search: %s (Use ESC/Arrows/Enter)",
                                searchCallback);
-    time_t raw_time;
-    struct tm *info;
     time(&raw_time);
     info = localtime(&raw_time);
 
