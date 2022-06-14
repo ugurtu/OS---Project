@@ -82,4 +82,7 @@ Supported Keys:
 
 Supported File types: 
 
-- every filetype
+- mainly for .txt filetype 
+- could open also other filetypes e.g.  
+  .png .jpg  etc. but inexpressive because header
+
