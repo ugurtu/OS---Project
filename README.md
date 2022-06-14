@@ -1,4 +1,4 @@
-## TECS - Editor
+## TeCS - Editor
 
 This project is a part of the lecture Operating Systems at the University of Basel. The goal of this project was to program a text editor in the style of nano or VIM. The program TECS (our editor) is written in C and usable via the terminal.  
 
@@ -78,7 +78,7 @@ Supported Keys:
 
 
 
-##### Filetypes
+##### Supported Filetypes
 
 Supported File types: 
 

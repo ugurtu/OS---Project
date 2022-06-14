@@ -595,7 +595,7 @@ void drawField(struct aBuffer *ab) {
             if (E.numrows == 0 && y == E.screenrows / 3) {
                 char welcome[80];
                 int welcomelen = snprintf(welcome, sizeof(welcome),
-                                          "\U0001F4DD \x1b[7m teCS -- version %s", TECS_VERSION);
+                                          "\U0001F4DD \x1b[7m TeCS -- version %s", TECS_VERSION);
                 if (welcomelen > E.screencols) welcomelen = E.screencols;
                 int padding = (E.screencols - welcomelen) / 2;
                 if (padding) {
