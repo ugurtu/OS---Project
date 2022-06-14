@@ -54,7 +54,8 @@ typedef struct erow {
 } erow;
 
 /**
- *
+ * This struct sets up a global struct that will contain our editor state,
+ * which we’ll use to store the width and height of the terminal.
  */
 struct editorConfig {
     int cx, cy; //The cursors x and y position
@@ -165,20 +166,21 @@ void activateUnprocessedMode() {
 int readKeypress() {
     int nread;
     char c;
-    /** reads one byte at a time
-     * It can take two status one is 0 which represents the end of file
-     * or it can be 1 if an errors occurs.
-     *
-     * */
+/**
+ * the function read will, if it is successful, return the number of bytes read,
+ * which should be 1 in this case (because that is the amount of data that was requested).
+ * That is why the return value is compared with the value 1,
+ * and if it is not equal, then the program quits with an error message.
+ */
     while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
-        if (nread == -1 && errno != EAGAIN) {
+        if (nread == -1 && errno != EAGAIN) { //if error eagain then quit
             quit("read");
         };
     }
     if (c == '\x1b') {
         char seq[3];
-        if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';
-        if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
+        if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b'; //esc
+        if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b'; //esc
         if (seq[0] == '[') {
             if (seq[1] >= '0' && seq[1] <= '9') {
                 if (read(STDIN_FILENO, &seq[2], 1) != 1) return '\x1b';
@@ -312,7 +314,7 @@ int rXToCx(erow *row, int rx) {
 }
 
 /**
- * This function uses the chars string of an erow to fill the contents of the rendered string.
+ * This function uses the chars string of a row to fill the contents of the rendered string.
  * @param row
  */
 void updateRow(erow *row) {
@@ -363,7 +365,7 @@ void insertRow(int at, char *s, size_t len) {
 }
 
 /**
- * This function frees the memory owned by erow.
+ * This function frees the memory owned by row.
  * @param row
  */
 void editorFreeRow(erow *row) {
@@ -372,7 +374,7 @@ void editorFreeRow(erow *row) {
 }
 
 /**
- * This function deletes the erow.
+ * This function deletes the row.
  * @param at
  */
 void deleteRow(int at) {
@@ -385,7 +387,7 @@ void deleteRow(int at) {
 }
 
 /**
- *
+ * This function inserts a single character into a row at a given position.
  * @param row the erow we insert the character into
  * @param at the index we want to insert characters into
  * @param c position in the array
@@ -413,7 +415,7 @@ void appendString(erow *row, char *s, size_t len) {
     row->size += len; //update length
     row->chars[row->size] = '\0';
     updateRow(row);
-    E.dirty++;
+    E.dirty++; //increment dirty so that program knows that file was modified
 }
 
 /**
@@ -464,6 +466,7 @@ void insertChar(int c) {
 
 /**
  * This function allows us to add a new line or break an existing line. This is done using the Enter key.
+ * If we are at the beginning of a line, we just have to insert a new empty line before the line we are in.
  */
 void insertNewline() {
    if (E.cx == 0) { //If we are at the beginning of a line
@@ -482,7 +485,9 @@ void insertNewline() {
 }
 
 /*** append buffer ***/
-
+/**
+ * An append buffer consists of a pointer to our buffer in memory, and a length.
+ */
 struct aBuffer {
     char *b; //pointer to our buffer in memory
     int len;
@@ -491,7 +496,7 @@ struct aBuffer {
 #define ABUF_INIT {NULL, 0} //acts as a constructor
 
 /**
- * This function appends the string to an abuffer buffer
+ * This function appends the string to an aBuffer buffer
  * @param ab append buffer
  * @param s string
  * @param len of string
@@ -539,7 +544,7 @@ void scroll() {
 }
 
 /**
- * This function gives us useful information about the file
+ * This function gives us useful information about the file like linenumber, if modified and helpful commands
  * @param ab
  */
 void setStatusBar(struct aBuffer *ab) {
@@ -580,7 +585,7 @@ void drawStatusBar(struct aBuffer *ab) {
 }
 
 /**
- * This functions draws a tilde at every row like vim.
+ * This functions setups the field in which the character inout will be handled.
  */
 void drawField(struct aBuffer *ab) {
     int y;
@@ -615,7 +620,7 @@ void drawField(struct aBuffer *ab) {
 }
 
 /**
- * This function renders the interface.
+ * This function refreshed the window after each keypress.
  */
 void refreshScreen() {
     scroll();
@@ -631,7 +636,7 @@ void refreshScreen() {
     char buf[32];
     snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1,
              (E.rx - E.coloff) +
-             1); //To position the cursor on the screen, we have to subtract E.rowoff from E.cy. Same with E.rx. vor horizontal scrolling.
+             1); //To position the cursor on the screen, we have to subtract E.rowoff from E.cy. Same with E.rx. for horizontal scrolling.
 
     abAppend(&ab, buf, strlen(buf));
 
@@ -658,8 +663,9 @@ void setStatusMessage(const char *fmt, ...) {
 
 /*** input ***/
 /**
- * This function prompts the user to input a filename when saving a new file displayed in the status bar.
+ * This function displays a prompt in the status bar, and lets the user input a line of text after the prompt.
  * @param prompt
+ * @param callback
  * @return
  */
 char *inputFileName(char *prompt, void (*callback)(char *, int)) {
@@ -671,13 +677,13 @@ char *inputFileName(char *prompt, void (*callback)(char *, int)) {
         setStatusMessage(prompt, buf); //sets status message
         refreshScreen(); //refresh screen
         int c = readKeypress(); //waits for keypress
-        if (c == DEL_KEY || c == CTRL_KEY('h') || c == BACKSPACE) {
+        if (c == DEL_KEY || c == CTRL_KEY('h') || c == BACKSPACE) { //allows the user press backspace in the prompt
             if (buflen != 0) buf[--buflen] = '\0';
         } else if (c == '\x1b') { //if escape is pressed
             setStatusMessage("");
             if (callback) callback(buf, c);
             free(buf); //free the buf
-            return NULL;
+            return NULL; //return null
         } else if (c == '\r') { //when enter pressed
             if (buflen != 0) { //not empty
                 setStatusMessage(""); //status message cleared
@@ -752,10 +758,10 @@ char *rowToString(int *buflen) {
     for (j = 0; j < E.numrows; j++)
         totlen += E.row[j].size +
                   1; //adds up the lengths of each row of text and adding 1 to each one for the newline character we’ll add to the end of each line
-    *buflen = totlen;
+    *buflen = totlen; //save the total length into buflen, to tell the caller how long the string is
     char *buf = malloc(totlen); //allocating required memory
     char *p = buf;
-    for (j = 0; j < E.numrows; j++) {
+    for (j = 0; j < E.numrows; j++) { //loop through the rows
         memcpy(p, E.row[j].chars, E.row[j].size); //copy the contents of each row to the end of the buffer
         p += E.row[j].size;
         *p = '\n'; //appending a new line character after each row
@@ -792,9 +798,9 @@ void readFile(char *filename) {
  * This function writes the string returned by rowToString() to disk.
  */
 void saveFile() {
-    if (E.filename == NULL) {
+    if (E.filename == NULL) { //if its a new file
         E.filename = inputFileName("Save as: %s (ESC to cancel)", NULL);
-        if (E.filename == NULL) {
+        if (E.filename == NULL) { //if save is cancelled
 
             time(&raw_time);
             info = localtime(&raw_time);
@@ -807,7 +813,7 @@ void saveFile() {
     }
 
     int len;
-    char *buf = rowToString(&len);
+    char *buf = rowToString(&len); //call rowToString function
     int fd = open(E.filename, O_RDWR | O_CREAT,
                   0644); //create a file, open it for reading and writing. 0644 is standard permission for text files.
     if (fd != -1) {
@@ -985,7 +991,7 @@ void checkKeyPress() {
 
 /*** init ***/
 /**
- * Initializes all the fields in the E struct
+ * Initializes all the fields in the estruct
  */
 void initializeEditor() {
     E.cx = 0; //horizontal coordinate of cursor (column)
@@ -1004,7 +1010,7 @@ void initializeEditor() {
 }
 
 /**
- * Function to concat two chars needed for Help
+ * Function to concat two chars needed for statusbar
  *
  * @param s1 Tools
  * @param s2 time
@@ -1020,10 +1026,13 @@ char *concat(const char *s1, const char *s2) {
 }
 
 /**
- * The keyboard input gets red into the variable c.
- * The while loop reads 1 byte from the standard input into c. It keeps doing it
- * until there are no more bytes to read().
- * @return read() if there are bytes that it red. else 0 if it reaches the end of the file.
+ * First we activate the unprocessed mode so we disable features of the terminal which we dont need.
+ * After we initialize the editor with all its fields.
+ * If we start the program with a ready to read file, it opens the file if not it creates and empty file.(unnamed)
+ * After that we setup a help bar with important informations for handling our program.
+ * After that we enter the infinite while loop which runs as long as we dont quit the program.
+ * @param argc number of parameters
+ * @param argv name of the existing file
  */
 int main(int argc, char *argv[]) {
     activateUnprocessedMode();
