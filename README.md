@@ -1,6 +1,6 @@
 ## TeCS - Editor
 
-This project is a part of the lecture Operating Systems at the University of Basel. The goal of this project was to program a text editor in the style of nano or VIM. The program TECS (our editor) is written in C and usable via the terminal.  
+This project is a part of the lecture Operating Systems at the University of Basel. The goal of this project was to program a text editor in the style of nano or VIM. The program TeCS (our editor) is written in C and usable by the terminal.  
 
 | Contributors              | Begin    | End       | Version |
 | ------------------------- | -------- | --------- | ------- |
@@ -57,22 +57,22 @@ Supported Keys:
 
 | Usage       | Function                               | After Usage                |
 | :---------- | -------------------------------------- | -------------------------- |
-| Ctrl-s      | Saves the Files                        | type filename and filetype |
-| Ctrl-i      | Shows Information Bar                  | -                          |
-| Ctrl-f      | Search through File                    | type word or character     |
+| Ctrl-s      | Save file                       | type filename and filetype |
+| Ctrl-i      | Show information bar                  | -                          |
+| Ctrl-f      | Search through file                    | type word or character     |
 | Ctrl-q      | Quit the program                       | -                          |
 | Ctrl-h      | Backspace                              | -                          |
 | Del         | Delete                                 | -                          |
 | Backspace   | Delete                                 | -                          |
-| Enter       | Insert newline                         | -                          |
-| Tab         | Tabs                                   | -                          |
+| Enter       | Insert new line                         | -                          |
+| Tab         | Tab                                   | -                          |
 | Arrow Up    | Go up in file                          | -                          |
 | Arrow Down  | Go down in file                        | -                          |
 | Arrow Left  | Go left in file                        | -                          |
 | Arrow Right | Go right in file                       | -                          |
 | Space       | Insert a space after word or character | -                          |
-| Pg-Up       | Goes in small files at the beginning   | -                          |
-| Pg-Down     | Goes in small files at the end         | -                          |
+| Pg-Up       | Jumps to the beginning of the window   | -                          |
+| Pg-Down     | Jumps to the end of the window         | -                          |
 
 
 
@@ -80,9 +80,9 @@ Supported Keys:
 
 ##### Supported Filetypes
 
-Supported File types: 
+Supported file types: 
 
-- mainly for .txt filetype 
-- could open also other filetypes e.g.  
-  .png .jpg  etc. but inexpressive because header
+- Mainly for .txt filetype 
+- Could open also open other filetypes e.g.  
+  .png .jpg  etc. but inexpressive because of header.
 
