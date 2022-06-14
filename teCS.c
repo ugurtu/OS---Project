@@ -916,7 +916,7 @@ void checkKeyPress() {
         case CTRL_KEY('q'):
             if (E.dirty && (quit_times > 0)) {
                 setStatusMessage("\U000026A0 File has unsaved changes. "
-                                 "Press Ctrl-Q %d more times to quit.", quit_times);
+                                 "Press Ctrl-Q %d more time to quit.", quit_times);
                 quit_times--;
                 return;
             }
