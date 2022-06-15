@@ -62,14 +62,26 @@ struct editorConfig {
     int rx; //horizontal coordinate variable for render field
     int rowoff; //keeps track of what row the user is currently scrolled to
     int coloff; //keeps track of what column the user is currently scrolled to
-    int screenrows;
-    int screencols;
-    int numrows;
-    erow *row;
-    int dirty;
-    char *filename;
-    char statusmsg[80];
+    int screenrows; //for the rows
+    int screencols; //for the cols
+    int numrows; //num of rows
+    erow *row; //
+    int dirty; // after safe checks if theres a modification
+    char *filename; // name of the file
+    char statusmsg[80]; // message for informations
     time_t statusmsg_time;
+
+    /*
+    Many of the functions described here have a termios_p
+    argument that is a pointer to a termios structure.
+    This structure contains at least the following members:
+
+    tcflag_t c_iflag;  input modes
+    tcflag_t c_oflag;  output modes
+    tcflag_t c_cflag;  control modes
+    tcflag_t c_lflag;  local modes
+    cc_t     c_cc[NCCS]; special characters
+    */
     struct termios orig_termios;
 };
 struct editorConfig E;//stores the terminal attributes
